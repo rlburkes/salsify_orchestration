@@ -58,7 +58,7 @@ const debugMode = true;
 const logger = createLogger(debugMode);
 
 // Execute the extraction and log the result
-const result = extractCertificateData(productContext.context);
+const result = extractCertificateData(context);
 const retVal = {
   result: result,
   logs: logger.getLogs()
