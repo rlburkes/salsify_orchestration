@@ -77,7 +77,8 @@ var payload = {
                 "type": "string",
                 "description": "Address of the operator"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "controlBody": {
             "type": "object",
@@ -95,7 +96,8 @@ var payload = {
                 "type": "string",
                 "description": "Address of the control body"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "activities": {
             "type": "array",
@@ -119,7 +121,8 @@ var payload = {
                   "description": "List of product categories"
                 }
               }
-            }
+            },
+            "additionalProperties": false
           },
           "certificateDateAndPlace": {
             "type": "object",
@@ -138,7 +141,8 @@ var payload = {
                 "type": "string",
                 "description": "Name of the person who signed the certificate"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "validity": {
             "type": "object",
@@ -154,7 +158,8 @@ var payload = {
                 "format": "date",
                 "description": "End date of the certificate validity"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "complianceConfirmation": {
             "type": "string",
