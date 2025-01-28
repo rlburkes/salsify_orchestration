@@ -12,7 +12,8 @@ var content = [
 
 const mockCertificate = {
   "certificate": [
-    "https://smedia.supplierxm.salsify.com/product/document/9b2145fd-1886-47a3-8a86-802a98837167.pdf"
+    "https://images.salsify.com/image/upload/f_png/lacp7wbkvyf699ykxjcx",
+    "https://images.salsify.com/image/upload/f_png,pg_2/lacp7wbkvyf699ykxjcx"
   ]
 }
 
