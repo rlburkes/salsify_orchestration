@@ -38,7 +38,7 @@ function extractCertificateData(productContext) {
   const propertyCollections = productContext.entity.property_value_collections;
 
   for (let field of requiredFields) {
-    const matchingProperty = propertyCollections.find(collection => 
+    const matchingProperty = propertyCollections.find(collection =>
       collection.property && collection.property.external_id === field
     );
     if (matchingProperty && matchingProperty.values.length > 0) {
@@ -59,6 +59,7 @@ const logger = createLogger(debugMode);
 
 // Execute the extraction and log the result
 const result = extractCertificateData(productContext.context);
-
-
-
+const retVal = {
+  result: result,
+  logs: logger.getLogs()
+}

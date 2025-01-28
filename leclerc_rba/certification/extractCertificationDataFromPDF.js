@@ -1,42 +1,42 @@
-function promptCompletionsEndpoint(extractedData, pdfUrl) {
-  /*
-    This function sends a request to the completions endpoint to extract relevant data from the PDF.
-    Cette fonction envoie une requête au point de terminaison des complétions pour extraire les données pertinentes du PDF.
-  */
+const headers = {
+  "Content-Type": "application/json",
+  "Authorization": `Bearer ${secret_value('open-ai-key')}`
+};
 
-  const prompt = `Extract the following data from the PDF at ${pdfUrl}:
-  - ${Object.keys(extractedData).join("\n  - ")}
-
-  Please provide the extracted data in JSON format, with the keys matching the provided field names.`;
-
-  const requestPayload = {
-    model: "gpt-4",
-    prompt: prompt,
-    response_format: "json",
-    temperature: 0.0,
-    max_tokens: 1500
-  };
-
-  const response = web_request(
-    "https://api.openai.com/v1/completions",
-    "POST",
-    JSON.stringify(requestPayload),
-    {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer YOUR_API_KEY_HERE`
-    }
-  );
-
-  if (!response) {
-    logger("No response from completions endpoint");
-    return null;
+var content = [
+  {
+    "type": "text",
+    "text": `Please analyze the attached certificate PDF and extract embedded data.`
   }
+]
 
-  try {
-    const parsedResponse = JSON.parse(response);
-    return parsedResponse;
-  } catch (error) {
-    logger(`Error parsing response: ${error.message}`);
-    return null;
-  }
+const mockCertificate = {
+  "certificate": [
+    "https://smedia.supplierxm.salsify.com/product/document/9b2145fd-1886-47a3-8a86-802a98837167.pdf"
+  ]
 }
+
+Object.entries().forEach(entry => {
+  const [key, values] = entry;
+  values.forEach(imageUrl => {
+    content.push({
+      "type": "image_url",
+      "image_url": {
+        "url": imageUrl
+      }
+    });
+  });
+});
+
+var payload = {
+  "model": "gpt-4o",
+  "messages": [
+    {
+      "role": "user",
+      "content": content
+    }
+  ],
+  "max_tokens": 6000
+}
+
+web_request('https://api.openai.com/v1/chat/completions', 'post', payload, headers);
