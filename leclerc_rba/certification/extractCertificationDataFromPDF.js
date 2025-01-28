@@ -16,7 +16,7 @@ const mockCertificate = {
   ]
 }
 
-Object.entries().forEach(entry => {
+Object.entries(mockCertificate).forEach(entry => {
   const [key, values] = entry;
   values.forEach(imageUrl => {
     content.push({
