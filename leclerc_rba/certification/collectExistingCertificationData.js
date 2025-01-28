@@ -46,7 +46,7 @@ function extractCertificateData(productContext) {
       extractedData[field] = matchingProperty.values; // Assuming the first value is the relevant one
     } else {
       logger.log(`Missing field: ${field}`);
-      extractedData[field] = null; // Set default value if field is missing
+      extractedData[field] = null; // Set default value if field is missing force
     }
   }
 
