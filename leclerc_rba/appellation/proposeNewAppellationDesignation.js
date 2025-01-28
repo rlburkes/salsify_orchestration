@@ -139,5 +139,5 @@ function handleAocDetermination(entity, context, debugPrompt = false) {
 }
 
 // Example usage with a given context.entity
-const debugMode = false;
+const debugMode = true;
 handleAocDetermination(context.entity, context, debugMode);
