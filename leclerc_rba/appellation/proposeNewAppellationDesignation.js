@@ -181,9 +181,9 @@ function handleAocDetermination(entity, context, debugPrompt = false) {
 
 // Exemple d'utilisation avec un context.entity donné
 // Example usage with a given context.entity
-const debugMode = true;
+const debugMode = false;
 const result = handleAocDetermination(context.entity, context, debugMode);
-const logs = createLogger(debugMode).getLogs();
+const logs = createLogger(true).getLogs();
 
 const retVal = { result, logs };
 retVal;
