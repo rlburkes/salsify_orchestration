@@ -130,8 +130,7 @@ var payload = {
             "properties": {
               "date": {
                 "type": "string",
-                "format": "date",
-                "description": "Date of the certificate"
+                "description": "Date of the certificate (e.g., YYYY-MM-DD)"
               },
               "location": {
                 "type": "string",
@@ -150,13 +149,11 @@ var payload = {
             "properties": {
               "from": {
                 "type": "string",
-                "format": "date",
-                "description": "Start date of the certificate validity"
+                "description": "Start date of the certificate validity (e.g., YYYY-MM-DD)"
               },
               "to": {
                 "type": "string",
-                "format": "date",
-                "description": "End date of the certificate validity"
+                "description": "End date of the certificate validity (e.g., YYYY-MM-DD)"
               }
             },
             "additionalProperties": false
