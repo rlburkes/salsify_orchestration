@@ -185,4 +185,5 @@ const debugMode = true;
 const result = handleAocDetermination(context.entity, context, debugMode);
 const logs = createLogger(debugMode).getLogs();
 
-return { result, logs };
+const retVal = { result, logs };
+retVal;
