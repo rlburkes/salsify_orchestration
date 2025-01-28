@@ -38,6 +38,8 @@ var payload = {
     }
   ],
   "response_format": {
+    "type": 'json_schema',
+    "json_schema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
     "properties": {
@@ -157,6 +159,7 @@ var payload = {
       "validity",
       "compliance_confirmation"
     ]
+  }
   },
   "max_tokens": 6000
 }
