@@ -203,7 +203,7 @@ function handleAocDetermination(entity, context, debugPrompt = false) {
 
 // Exemple d'utilisation avec un context.entity donné
 // Example usage with a given context.entity
-const debugMode = false;
+const debugMode = true;
 const result = handleAocDetermination(context.entity, context, debugMode);
 const logs = createLogger(true).getLogs();
 
