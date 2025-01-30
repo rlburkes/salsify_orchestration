@@ -35,22 +35,44 @@ function sanitizeValue(value) {
   return typeof value === 'string' ? value.replace(/\n/g, ' ').trim() : value;
 }
 
-// Attribution des champs/métadonnées pour la proposition AOC
-// Field attribution/context metadata for the AOC proposal
 const fieldAttribution = {
-  "appellationViticole": "This field is critical for determining if the wine's appellation conforms to legal AOC definitions.",
-  "countryOfOrigin": "Country of origin can influence AOC classification by regional standards.",
-  "wineRegion": "The region directly impacts AOC status, as certain AOCs are specific to regions.",
-  "grapeVariety": "Some AOCs only allow specific grape varieties."
+  "Appellation Viticole": "This field is critical for determining if the wine's appellation conforms to legal AOC definitions.",
+  "Appellation Viticole (Computed)": "This field contains computed data about the wine's appellation, which may provide additional insight.",
+  "Country of Origin": "Country of origin can influence AOC classification by regional standards.",
+  "Wine Region": "The region directly impacts AOC status, as certain AOCs are specific to regions.",
+  "Grape Variety (Cépage)": "Some AOCs only allow specific grape varieties.",
+  "Alcohol Content (Degré d'alcool)": "Certain AOC rules stipulate alcohol content ranges.",
+  "Aromas (Arômes)": "The aromas could align with regional flavor profiles required for specific AOCs.",
+  "Tasting Characteristics": "Tasting characteristics help ensure the product aligns with the sensory expectations of a given AOC.",
+  "Aging Potential (Potentiel de garde)": "Aging potential may be part of the requirements for particular AOCs.",
+  "Excise Code (Code Produit Accise France)": "French excise codes can be linked to the legal classification of AOCs.",
+  "Customs Classification Code": "Customs codes can be tied to how products are taxed or classified, potentially impacting AOC designation.",
+  "Domain or Château Name": "A Château's name may have historical or legal significance tied to AOC regulations.",
+  "Brand Name": "Marketing standards and branding rules may tie into specific AOC rules.",
+  "Legal Sales Name": "The legal sales name is the officially recognized designation under local or national law. It reflects how the product is classified for sale, often including terms related to the wine’s geographic designation (AOC, IGP, etc.). This name must comply with the regulatory framework governing appellations, making it a direct indicator of the wine’s intended classification and helping to confirm if it aligns with the appropriate designation.",
+  "Vineyard Region": "The vineyard region provides the geographical origin of the wine, which is fundamental to AOC and IGP designations. AOC classifications are tightly bound to specific regions, and only wines produced in those areas can claim the corresponding designation. Identifying the vineyard region ensures that the wine complies with the geographic boundaries necessary for the designation",
+  "Producer Postal Code": "The postal code gives precise geographic information about the producer’s location, helping verify if the vineyard falls within the boundary of a legally protected appellation. Many AOCs and IGPs have stringent geographic limits, and the postal code allows for fine-grained validation of whether the product comes from an approved area."
 };
 
-// Correspondance directe entre les clés de propriété et external_id
-// Direct mapping from property keys to external_id
+// Mappage direct des clés de propriétés aux identifiants externes
+// Direct mapping of property keys to external identifiers
 const propertyKeyToExternalIdMap = {
-  "appellationViticole": "Appellation viticole",
-  "countryOfOrigin": "Pays d’origine",
-  "wineRegion": "Région Viticole",
-  "grapeVariety": "Cépage"
+  "Appellation Viticole": "Appellation viticole",
+  "Appellation Viticole (Computed)": "Appellation viticole (computed)",
+  "Country of Origin": "Pays d’origine",
+  "Wine Region": "Région Viticole",
+  "Grape Variety": "Cépage",
+  "Alcohol Content": "Degré d'alcool",
+  "Aromas": "Arômes",
+  "Tasting Characteristics": "Caractéristiques de dégustation",
+  "Aging Potential": "Potentiel de garde",
+  "Excise Code": "Code Produit Accise France",
+  "Customs Classification Code": "Code de nomenclature douanière",
+  "Domain or Château Name": "Nom du domaine ou château",
+  "Brand Name": "Marque commerciale",
+  "Legal Sales Name": "Dénomination légale de vente",
+  "Vineyard Region": "Région du vignoble",
+  "Producer Postal Code": "Contacts - Adresse - Code postal"
 };
 
 // Fonction pour rechercher les valeurs de propriété à l'aide de la correspondance directe
