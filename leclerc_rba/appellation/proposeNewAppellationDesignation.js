@@ -135,7 +135,7 @@ function fetchAocDeterminationSync(entity, context, debugPrompt, logger) {
       },
       {
         "role": "user",
-        "content": `Please provide a suggested AOC designation for the following product details:\n${serializedContext}`
+        "content": `Please provide an Appellation designation for the following product:\n${serializedContext}`
       }
     ],
     "response_format": {
