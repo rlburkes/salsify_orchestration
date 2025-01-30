@@ -75,18 +75,17 @@ const propertyKeyToExternalIdMap = {
   "Producer Postal Code": "Contacts - Adresse - Code postal"
 };
 
-// Fonction pour rechercher les valeurs de propriété à l'aide de la correspondance directe
-// Function to lookup property values using the direct mapping
-function lookupPropertyValues(entity, externalId) {
-  const collection = entity?.propertyValueCollections?.find(p => p.property.externalId === externalId);
+function lookupPropertyValues(entity, externalId, logger) {
+  logger.log(`Looking up property values for: ${externalId}`);
+  const collection = entity?.property_value_collections?.find(p => p.property.external_id === externalId);
   return collection ? collection.values : null;
 }
 
-// Fonction pour structurer les propriétés pertinentes pour la génération AOC
-// Function to structure the relevant properties for AOC generation
-function structureAocProperties(entity, logger) {
-  if (!entity || !entity.propertyValueCollections) {
-    logger.log("Entity or propertyValueCollections is missing.");
+// Fonction pour structurer les propriétés pertinentes pour l'évaluation de l'AOC
+// Function to structure relevant properties for AOC determination
+function structureAOCProperties(entity, logger) {
+  if (!entity || !entity.property_value_collections) {
+    logger.log("Entity or property collections are missing.");
     return {};
   }
 
@@ -94,30 +93,30 @@ function structureAocProperties(entity, logger) {
 
   Object.keys(propertyKeyToExternalIdMap).forEach(key => {
     const externalId = propertyKeyToExternalIdMap[key];
-    const values = lookupPropertyValues(entity, externalId);
+    const values = lookupPropertyValues(entity, externalId, logger);
 
     if (values) {
       relevantProperties[key] = values.map(value => sanitizeValue(formatPropertyValue(value)));
+      logger.log(`Structured property: ${key} -> ${relevantProperties[key]}`);
     }
   });
 
-  logger.log("Structured AOC properties: " + JSON.stringify(relevantProperties));
   return relevantProperties;
 }
 
-// Fonction pour sérialiser les propriétés pertinentes en une chaîne de contexte pour la détermination AOC
-// Function to serialize the relevant properties into a context string for AOC determination
-function serializeAocContext(relevantProperties, logger) {
-  const context = Object.entries(relevantProperties)
+// Fonction pour sérialiser les propriétés pertinentes dans une chaîne de contexte lisible
+// Function to serialize relevant properties into a human-readable context string
+function serializeAOCContext(relevantProperties, logger) {
+  logger.log("Serializing AOC context...");
+  const contextString = Object.entries(relevantProperties)
     .filter(([_, value]) => value && value.length > 0)
     .map(([key, value]) => {
       const contextInfo = fieldAttribution[key] ? ` (${fieldAttribution[key]})` : '';
       return `${key}${contextInfo}: ${value.join(', ')}`;
     })
     .join('\n');
-
-  logger.log("Serialized AOC context: " + context);
-  return context;
+  logger.log(`Serialized context:\n${contextString}`);
+  return contextString;
 }
 
 // Fonction pour récupérer la détermination AOC avec un format de réponse spécifié
