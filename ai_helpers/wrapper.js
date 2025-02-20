@@ -79,8 +79,8 @@ function createAIAbstraction() {
       "max_tokens": params.max_tokens || 1000
       // Add Anthropic-specific fields if needed
     };
-    var response = web_request(url, "POST", JSON.stringify(payload), headers);
-    return JSON.parse(response);
+    var response = web_request(url, "POST", payload, headers);
+    return response;
   }
 
   function callGemini(prompt, params) {
@@ -94,8 +94,8 @@ function createAIAbstraction() {
       "max_tokens": params.max_tokens || 1000
       // Adjust as needed for Gemini
     };
-    var response = web_request(url, "POST", JSON.stringify(payload), headers);
-    return JSON.parse(response);
+    var response = web_request(url, "POST", payload, headers);
+    return response;
   }
 
   function callOpenAI(prompt, params) {
@@ -111,8 +111,8 @@ function createAIAbstraction() {
       "max_tokens": params.max_tokens || 1000
       // Add more OpenAI-specific fields if needed
     };
-    var response = web_request(url, "POST", JSON.stringify(payload), headers);
-    return JSON.parse(response);
+    var response = web_request(url, "POST", payload, headers);
+    return response;
   }
 
   function callMistral(prompt, params) {
@@ -126,8 +126,8 @@ function createAIAbstraction() {
       "max_tokens": params.max_tokens || 1000
       // Add Mistral-specific fields if needed
     };
-    var response = web_request(url, "POST", JSON.stringify(payload), headers);
-    return JSON.parse(response);
+    var response = web_request(url, "POST", payload, headers);
+    return response;
   }
 
   // Return the object that your system can bind to.
