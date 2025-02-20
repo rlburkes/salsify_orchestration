@@ -1,8 +1,11 @@
 /**
  * This module returns an object "SalsifyAI" that exposes provider-specific builder methods.
  * Each provider object includes chainable methods for configuration (e.g. setApiKey, setBaseUrl)
- * as well as an addContext method. The addContext method appends a clearly demarcated JSON blob
- * to the prompt before the callCompletion method sends it.
+ * as well as an addContext method to attach structured data to every prompt.
+ *
+ * The callCompletion method now supports a debug flag:
+ *   - When debug is false (default), it returns the extracted content.
+ *   - When debug is true, it returns an object with the full prompt, raw response, and extracted content.
  *
  * Relies on a synchronous web_request(url, method, payload, headers) function provided by your environment.
  */
@@ -47,7 +50,6 @@ function createSalsifyAI() {
     function addContext(noun, data) {
       var dataString;
       if (typeof data === "object") {
-        // Pretty-print JSON with indentation.
         dataString = JSON.stringify(data, null, 2);
       } else {
         dataString = String(data);
@@ -58,24 +60,55 @@ function createSalsifyAI() {
     }
 
     /**
+     * Extracts the relevant text content from the raw response, based on the provider.
+     * For OpenAI, it pulls from choices[0].message.content.
+     * For Anthropic, Gemini, and Mistral it looks for a 'completion' or 'text' field.
+     *
+     * @param {object} response - The raw response object.
+     * @returns {string} - The extracted content (or an empty string if not found).
+     */
+    function extractContent(response) {
+      if (providerName === "OpenAI") {
+        if (response.choices && response.choices.length > 0 && response.choices[0].message) {
+          return response.choices[0].message.content;
+        }
+      } else if (providerName === "Anthropic") {
+        return response.completion || "";
+      } else if (providerName === "Gemini" || providerName === "Mistral") {
+        return response.completion || response.text || "";
+      }
+      return "";
+    }
+
+    /**
      * Calls the completion API after pre-pending all stored context blocks to the prompt.
+     * If params.debug is true, returns an object with the full prompt, raw response, and extracted content.
+     * Otherwise, returns just the extracted content.
      *
      * @param {string} prompt - The original prompt.
-     * @param {object} [params] - Additional parameters for the API call (e.g. max_tokens, model).
-     * @returns {object} - The response from the API.
+     * @param {object} [params] - Additional parameters for the API call (e.g. max_tokens, model, debug).
+     * @returns {object|string} - The filtered content or a detailed object if debug is true.
      */
     function callCompletion(prompt, params) {
       if (!finalApiKey) {
         throw new Error("No API key set for " + providerName + ".");
       }
       params = params || {};
+      var debug = params.debug || false;
 
-      var fullPrompt = "";
-      if (contexts.length > 0) {
-        fullPrompt = contexts.join("\n") + "\n";
+      var fullPrompt = (contexts.length > 0 ? contexts.join("\n") + "\n" : "") + prompt;
+      var response = callFn(finalApiKey, finalBaseUrl, fullPrompt, params);
+      var content = extractContent(response);
+
+      if (debug) {
+        return {
+          prompt: fullPrompt,
+          rawResponse: response,
+          content: content
+        };
+      } else {
+        return content;
       }
-      fullPrompt += prompt;
-      return callFn(finalApiKey, finalBaseUrl, fullPrompt, params);
     }
 
     var providerObj = {
@@ -101,9 +134,8 @@ function createSalsifyAI() {
       "messages": [{ "role": "user", "content": prompt }],
       "max_tokens": params.max_tokens || 1000
     };
-    // Pass the payload object directly; web_request handles stringification/parsing.
-    var response = web_request(url, "POST", payload, headers);
-    return response;
+    // web_request handles JSON conversion.
+    return web_request(url, "POST", payload, headers);
   }
 
   function callAnthropic(apiKey, baseUrl, prompt, params) {
@@ -116,8 +148,7 @@ function createSalsifyAI() {
       "prompt": prompt,
       "max_tokens": params.max_tokens || 1000
     };
-    var response = web_request(url, "POST", payload, headers);
-    return response;
+    return web_request(url, "POST", payload, headers);
   }
 
   function callGemini(apiKey, baseUrl, prompt, params) {
@@ -130,8 +161,7 @@ function createSalsifyAI() {
       "prompt": prompt,
       "max_tokens": params.max_tokens || 1000
     };
-    var response = web_request(url, "POST", payload, headers);
-    return response;
+    return web_request(url, "POST", payload, headers);
   }
 
   function callMistral(apiKey, baseUrl, prompt, params) {
@@ -144,32 +174,21 @@ function createSalsifyAI() {
       "prompt": prompt,
       "max_tokens": params.max_tokens || 1000
     };
-    var response = web_request(url, "POST", payload, headers);
-    return response;
+    return web_request(url, "POST", payload, headers);
   }
 
   // ------------------ Public SalsifyAI object ------------------
 
   return {
-    /**
-     * Returns an OpenAI provider object.
-     * Usage:
-     *   var openAI = SalsifyAI.openAIProvider("YOUR_KEY");
-     *   openAI.addContext("Product Data", context.product);
-     *   var result = openAI.callCompletion("Hello!", { max_tokens: 50 });
-     */
     openAIProvider: function(apiKey, baseUrl) {
       return createProvider("OpenAI", "https://api.openai.com/v1", apiKey, baseUrl, callOpenAI);
     },
-
     anthropicProvider: function(apiKey, baseUrl) {
       return createProvider("Anthropic", "https://api.anthropic.com", apiKey, baseUrl, callAnthropic);
     },
-
     geminiProvider: function(apiKey, baseUrl) {
       return createProvider("Gemini", "https://api.google.com/gemini", apiKey, baseUrl, callGemini);
     },
-
     mistralProvider: function(apiKey, baseUrl) {
       return createProvider("Mistral", "https://api.mistral.com", apiKey, baseUrl, callMistral);
     }
