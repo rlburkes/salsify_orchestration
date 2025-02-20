@@ -1,92 +1,87 @@
 /**
- * This script returns a single abstraction object that:
- *  1) Allows you to set configuration (provider, apiKey, baseUrl).
- *  2) Lets you call callCompletion(...) to invoke the configured AI provider.
+ * Minimal ES5 module returning an object "SalsifyAI" with provider-specific
+ * methods (e.g. openAIProvider, anthropicProvider) that each return an
+ * AI client object. That AI client object has:
+ *   - setApiKey(key)
+ *   - setBaseUrl(url)
+ *   - callCompletion(prompt, params)
  *
- * It relies on a synchronous web_request(url, method, payload, headers) function
- * that your environment provides.
+ * Relies on a synchronous web_request(url, method, payload, headers) function.
  */
-function createAIAbstraction() {
-  // Internal "state" for the abstraction
-  var finalProvider = null;
-  var finalApiKey = null;
-  var finalBaseUrl = null;
 
+function createSalsifyAI() {
   /**
-   * Maps provider name to a default base URL if none is provided.
+   * Common factory to build a provider object with chainable config.
    */
-  function getDefaultBaseUrl(provider) {
-    var defaults = {
-      "anthropic": "https://api.anthropic.com",
-      "gemini":    "https://api.google.com/gemini",
-      "openai":    "https://api.openai.com/v1",
-      "mistral":   "https://api.mistral.com"
+  function createProvider(providerName, defaultBaseUrl, apiKey, baseUrl, callFn) {
+    var finalApiKey = apiKey || "";
+    var finalBaseUrl = baseUrl || defaultBaseUrl;
+
+    // Chainable setter for API key
+    function setApiKey(key) {
+      finalApiKey = key;
+      return this;
+    }
+
+    // Chainable setter for base URL
+    function setBaseUrl(url) {
+      finalBaseUrl = url;
+      return this;
+    }
+
+    // The main completion call
+    function callCompletion(prompt, params) {
+      if (!finalApiKey) {
+        throw new Error("No API key set for " + providerName + ".");
+      }
+      return callFn(finalApiKey, finalBaseUrl, prompt, params || {});
+    }
+
+    // Return the provider object
+    return {
+      provider: providerName,
+      setApiKey: setApiKey,
+      setBaseUrl: setBaseUrl,
+      callCompletion: callCompletion
     };
-    var lower = (provider || "").toLowerCase();
-    if (!defaults[lower]) {
-      throw new Error("Unsupported provider: " + provider);
-    }
-    return defaults[lower];
   }
 
-  /**
-   * Sets the config for which provider to use, along with API key and optional base URL.
-   * @param {string} provider - e.g. "anthropic", "gemini", "openai", or "mistral"
-   * @param {string} apiKey - The API key/token for that provider
-   * @param {string} [baseUrl] - (Optional) If you need to override the default base URL
-   */
-  function setConfig(provider, apiKey, baseUrl) {
-    finalProvider = (provider || "").toLowerCase();
-    finalApiKey = apiKey;
-    finalBaseUrl = baseUrl || getDefaultBaseUrl(finalProvider);
-  }
+  // ------------------ Provider-specific call functions ------------------
 
-  /**
-   * Main method to request a completion from the configured provider.
-   * @param {string} prompt - The user prompt or message
-   * @param {object} [params] - Additional parameters (e.g. max_tokens, model)
-   * @returns {object} - Parsed JSON response from the provider
-   */
-  function callCompletion(prompt, params) {
-    if (!finalProvider || !finalApiKey) {
-      throw new Error("Configuration not set. Call setConfig(provider, apiKey, [baseUrl]) first.");
-    }
-    params = params || {};
-
-    if (finalProvider === "anthropic") {
-      return callAnthropic(prompt, params);
-    } else if (finalProvider === "gemini") {
-      return callGemini(prompt, params);
-    } else if (finalProvider === "openai") {
-      return callOpenAI(prompt, params);
-    } else if (finalProvider === "mistral") {
-      return callMistral(prompt, params);
-    } else {
-      throw new Error("Unsupported provider: " + finalProvider);
-    }
-  }
-
-  // ------------------ Provider-specific methods ------------------
-
-  function callAnthropic(prompt, params) {
-    var url = finalBaseUrl + "/v1/complete";
+  function callOpenAI(apiKey, baseUrl, prompt, params) {
+    var url = baseUrl + "/chat/completions";
     var headers = {
-      "Authorization": "Bearer " + finalApiKey,
+      "Authorization": "Bearer " + apiKey,
       "Content-Type": "application/json"
     };
     var payload = {
-      "prompt": prompt,
+      "model": params.model || "gpt-4",
+      "messages": [{ "role": "user", "content": prompt }],
       "max_tokens": params.max_tokens || 1000
-      // Add Anthropic-specific fields if needed
     };
     var response = web_request(url, "POST", payload, headers);
     return response;
   }
 
-  function callGemini(prompt, params) {
-    var url = finalBaseUrl + "/v1/complete";
+  function callAnthropic(apiKey, baseUrl, prompt, params) {
+    var url = baseUrl + "/v1/complete";
     var headers = {
-      "Authorization": "Bearer " + finalApiKey,
+      "Authorization": "Bearer " + apiKey,
+      "Content-Type": "application/json"
+    };
+    var payload = {
+      "prompt": prompt,
+      "max_tokens": params.max_tokens || 1000
+      // Add more Anthropic-specific fields if needed
+    };
+    var response = web_request(url, "POST", payload, headers);
+    return response;
+  }
+
+  function callGemini(apiKey, baseUrl, prompt, params) {
+    var url = baseUrl + "/v1/complete";
+    var headers = {
+      "Authorization": "Bearer " + apiKey,
       "Content-Type": "application/json"
     };
     var payload = {
@@ -98,27 +93,10 @@ function createAIAbstraction() {
     return response;
   }
 
-  function callOpenAI(prompt, params) {
-    // Using OpenAI's Chat Completions endpoint
-    var url = finalBaseUrl + "/chat/completions";
+  function callMistral(apiKey, baseUrl, prompt, params) {
+    var url = baseUrl + "/v1/complete";
     var headers = {
-      "Authorization": "Bearer " + finalApiKey,
-      "Content-Type": "application/json"
-    };
-    var payload = {
-      "model": params.model || "gpt-4",
-      "messages": [{ "role": "user", "content": prompt }],
-      "max_tokens": params.max_tokens || 1000
-      // Add more OpenAI-specific fields if needed
-    };
-    var response = web_request(url, "POST", payload, headers);
-    return response;
-  }
-
-  function callMistral(prompt, params) {
-    var url = finalBaseUrl + "/v1/complete";
-    var headers = {
-      "Authorization": "Bearer " + finalApiKey,
+      "Authorization": "Bearer " + apiKey,
       "Content-Type": "application/json"
     };
     var payload = {
@@ -130,17 +108,62 @@ function createAIAbstraction() {
     return response;
   }
 
-  // Return the object that your system can bind to.
-  // It exposes both setConfig and callCompletion.
+  // ------------------ Public "SalsifyAI" object ------------------
+
   return {
-    setConfig: setConfig,
-    callCompletion: callCompletion
+    /**
+     * Creates a provider object for OpenAI with optional immediate API key and base URL.
+     */
+    openAIProvider: function(apiKey, baseUrl) {
+      return createProvider(
+        "OpenAI",
+        "https://api.openai.com/v1",
+        apiKey,
+        baseUrl,
+        callOpenAI
+      );
+    },
+
+    /**
+     * Creates a provider object for Anthropic with optional immediate API key and base URL.
+     */
+    anthropicProvider: function(apiKey, baseUrl) {
+      return createProvider(
+        "Anthropic",
+        "https://api.anthropic.com",
+        apiKey,
+        baseUrl,
+        callAnthropic
+      );
+    },
+
+    /**
+     * Creates a provider object for Google Gemini with optional immediate API key and base URL.
+     */
+    geminiProvider: function(apiKey, baseUrl) {
+      return createProvider(
+        "Gemini",
+        "https://api.google.com/gemini",
+        apiKey,
+        baseUrl,
+        callGemini
+      );
+    },
+
+    /**
+     * Creates a provider object for Mistral with optional immediate API key and base URL.
+     */
+    mistralProvider: function(apiKey, baseUrl) {
+      return createProvider(
+        "Mistral",
+        "https://api.mistral.com",
+        apiKey,
+        baseUrl,
+        callMistral
+      );
+    }
   };
 }
 
-// Create the abstraction and return it.
-// Your system can then do something like:
-//   myAI.setConfig("openai", "YOUR_KEY");
-//   var result = myAI.callCompletion("Hello!", { max_tokens: 50 });
-var AIAbstraction = createAIAbstraction();
-AIAbstraction;
+// Create the SalsifyAI object and return it so your system can bind to it.
+createSalsifyAI();
