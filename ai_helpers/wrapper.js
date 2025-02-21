@@ -10,7 +10,7 @@
 function createSalsifyAI() {
 
   // A shared function to perform the web request using the built request object.
-  function doRequest(requestObject) {
+  function performRequest(requestObject) {
     return web_request(requestObject.url, requestObject.method, requestObject.payload, requestObject.headers);
   }
 
@@ -28,6 +28,7 @@ function createSalsifyAI() {
       };
     } else if (providerName === "Anthropic") {
       // Updated for Claude per your curl:
+      req.url = finalApiUrl(finalApiKey, finalBaseUrl, "/v1/messages"); // using finalApiUrl to join base and path
       req.url = finalApiUrl(finalBaseUrl, "/v1/messages");
       req.method = "POST";
       req.headers = {
@@ -53,12 +54,16 @@ function createSalsifyAI() {
         req.payload.maxOutputTokens = params.maxOutputTokens;
       }
     } else if (providerName === "Mistral") {
-      req.url = finalApiUrl(finalBaseUrl, "/v1/complete");
+      req.url = finalApiUrl(finalBaseUrl, "/v1/chat/completions");
       req.method = "POST";
-      req.headers = { "Authorization": "Bearer " + finalApiKey, "Content-Type": "application/json" };
+      req.headers = {
+        "Authorization": "Bearer " + finalApiKey,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      };
       req.payload = {
-        "prompt": fullPrompt,
-        "max_tokens": params.max_tokens || 1000
+        "model": params.model || "mistral-large-latest",
+        "messages": [{ "role": "user", "content": fullPrompt }]
       };
     }
     return req;
@@ -101,9 +106,9 @@ function createSalsifyAI() {
           return response.choices[0].message.content;
         }
       } else if (providerName === "Anthropic") {
-        // Instead of looping, return the first element's value using its type key.
+        // For Anthropic, return: response.content[0][ response.content[0].type ]
         if (response.content && response.content.length > 0 && response.content[0] && response.content[0].type) {
-          return response.content[0][ response.content[0].type ] || "";
+          return response.content[0][response.content[0].type] || "";
         }
         return "";
       } else if (providerName === "Gemini") {
@@ -115,7 +120,11 @@ function createSalsifyAI() {
         }
         return "";
       } else if (providerName === "Mistral") {
-        return response.completion || response.text || "";
+        // For Mistral, extract from choices[0].message.content
+        if (response.choices && response.choices.length > 0 && response.choices[0].message) {
+          return response.choices[0].message.content;
+        }
+        return "";
       }
       return "";
     }
@@ -134,7 +143,7 @@ function createSalsifyAI() {
       if (simulate) {
         return requestObject;
       }
-      var response = doRequest(requestObject);
+      var response = performRequest(requestObject);
       var content = extractContent(response);
       if (debug) {
         return {
@@ -169,7 +178,7 @@ function createSalsifyAI() {
       return createProvider("Gemini", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", apiKey, baseUrl);
     },
     mistralProvider: function(apiKey, baseUrl) {
-      return createProvider("Mistral", "https://api.mistral.com", apiKey, baseUrl);
+      return createProvider("Mistral", "https://api.mistral.ai", apiKey, baseUrl);
     }
   };
 }
