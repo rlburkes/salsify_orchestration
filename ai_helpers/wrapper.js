@@ -1,8 +1,8 @@
 /**
  * This module returns an object "SalsifyAI" that exposes provider-specific builder methods.
  * Each provider object includes chainable methods for configuration (setApiKey, setBaseUrl),
- * an addContext method to attach structured data to every prompt, and a callCompletion method that
- * supports a simulation mode and a debug flag.
+ * an addContext method to attach structured data to every prompt, and a callCompletion method
+ * that supports simulation mode and a debug flag.
  *
  * This version is written in pure ES5 (synchronous, no Promises) and reuses the built request object.
  * It assumes that a synchronous web_request(url, method, payload, headers) function is available.
@@ -10,7 +10,7 @@
 function createSalsifyAI() {
 
   // A shared function to perform the web request using the built request object.
-  function performRequest(requestObject) {
+  function doRequest(requestObject) {
     return web_request(requestObject.url, requestObject.method, requestObject.payload, requestObject.headers);
   }
 
@@ -27,15 +27,20 @@ function createSalsifyAI() {
         "max_tokens": params.max_tokens || 1000
       };
     } else if (providerName === "Anthropic") {
-      req.url = finalApiUrl(finalBaseUrl, "/v1/complete");
+      // Updated for Claude per your curl:
+      req.url = finalApiUrl(finalBaseUrl, "/v1/messages");
       req.method = "POST";
-      req.headers = { "Authorization": "Bearer " + finalApiKey, "Content-Type": "application/json" };
+      req.headers = {
+        "x-api-key": finalApiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json"
+      };
       req.payload = {
-        "prompt": fullPrompt,
-        "max_tokens": params.max_tokens || 1000
+        "model": params.model || "claude-3-5-sonnet-20241022",
+        "max_tokens": params.max_tokens || 1024,
+        "messages": [{ "role": "user", "content": fullPrompt }]
       };
     } else if (providerName === "Gemini") {
-      // For Gemini, the API key is passed as a query parameter.
       req.url = finalApiUrl(finalBaseUrl, "") + "?key=" + finalApiKey;
       req.method = "POST";
       req.headers = { "Content-Type": "application/json" };
@@ -61,7 +66,6 @@ function createSalsifyAI() {
 
   // Helper to correctly join base URLs with endpoint paths.
   function finalApiUrl(base, path) {
-    // Remove any trailing slash from base
     if (base.charAt(base.length - 1) === "/") {
       base = base.substr(0, base.length - 1);
     }
@@ -80,8 +84,6 @@ function createSalsifyAI() {
     }
 
     function setBaseUrl(url) {
-      finalApiUrl = url;
-      finalApiBaseUrl = url;
       finalBaseUrl = url;
       return providerObj;
     }
@@ -99,7 +101,11 @@ function createSalsifyAI() {
           return response.choices[0].message.content;
         }
       } else if (providerName === "Anthropic") {
-        return response.completion || "";
+        // Instead of looping, return the first element's value using its type key.
+        if (response.content && response.content.length > 0 && response.content[0] && response.content[0].type) {
+          return response.content[0][ response.content[0].type ] || "";
+        }
+        return "";
       } else if (providerName === "Gemini") {
         if (response.candidates && response.candidates.length > 0) {
           var candidate = response.candidates[0];
@@ -128,7 +134,7 @@ function createSalsifyAI() {
       if (simulate) {
         return requestObject;
       }
-      var response = performRequest(requestObject);
+      var response = doRequest(requestObject);
       var content = extractContent(response);
       if (debug) {
         return {
