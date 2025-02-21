@@ -167,8 +167,8 @@ function createSalsifyAI() {
       // If a response_format is provided and the provider does NOT support it natively,
       // prepend a directive.
       if (params.response_format && !providerSupportsJSON) {
-        var directive = "Response Schema: " + JSON.stringify(params.response_format) + "\n" +
-                        "Directive: Please output only the raw JSON without markdown formatting, explanation, or commentary.";
+        var directive = "----- RESPONSE WITH THIS SCHEMA: " + JSON.stringify(params.response_format) + "\n" +
+                        "----- CRITICAL DIRECTIVE: Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary.";
         fullPrompt = directive + "\n" + fullPrompt;
       }
 
