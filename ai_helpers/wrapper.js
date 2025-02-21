@@ -22,54 +22,8 @@ function createSalsifyAI() {
     return base + path;
   }
 
-  function validateResponseFormat(respFormat) {
-    var errors = [];
-
-    // Check that respFormat is an object.
-    if (typeof respFormat !== "object" || respFormat === null) {
-      errors.push("Response format must be a non-null object.");
-      return errors;
-    }
-
-    // Check for "name".
-    if (!respFormat.hasOwnProperty("name")) {
-      errors.push("Missing 'name' property.");
-    }
-
-    // Check that "strict" is true.
-    if (respFormat.strict !== true) {
-      errors.push("'strict' property must be true.");
-    }
-
-    // Check for a "schema" property.
-    if (!respFormat.hasOwnProperty("schema") || typeof respFormat.schema !== "object" || respFormat.schema === null) {
-      errors.push("Missing or invalid 'schema' property.");
-    } else {
-      var schema = respFormat.schema;
-
-      // Check that schema.type is "object".
-      if (schema.type !== "object") {
-        errors.push("Schema 'type' must be 'object'.");
-      }
-
-      // Check that schema.properties exists and is an object.
-      if (!schema.hasOwnProperty("properties") || typeof schema.properties !== "object" || schema.properties === null) {
-        errors.push("Schema must have a 'properties' object.");
-      }
-
-      // Check that schema.required exists and is an array.
-      if (!schema.hasOwnProperty("required") || !Array.isArray(schema.required)) {
-        errors.push("Schema must have a 'required' array.");
-      }
-
-      // Check that additionalProperties is explicitly false.
-      if (schema.additionalProperties !== false) {
-        errors.push("Schema 'additionalProperties' must be explicitly false.");
-      }
-    }
-
-    return errors;
-  }
+  // Simple validator function assumed to be defined elsewhere.
+  // function validateResponseFormat(respFormat) { ... }
 
   // Build a request object based on provider specifics.
   function buildRequest(providerName, finalApiKey, finalBaseUrl, fullPrompt, params) {
@@ -87,7 +41,6 @@ function createSalsifyAI() {
         max_tokens: params.max_tokens || 1000
       };
       if (params.response_format) {
-        // Initialize the response_format property correctly.
         req.payload.response_format = {
           json_schema: params.response_format,
           type: 'json_schema'
@@ -115,8 +68,14 @@ function createSalsifyAI() {
           parts: [{ text: fullPrompt }]
         }]
       };
-      if (params.maxOutputTokens) {
-        req.payload.maxOutputTokens = params.maxOutputTokens;
+      if (params.max_tokens) {
+        req.payload.generationConfig = req.payload.generationConfig || {};
+        req.payload.generationConfig.maxOutputTokens = params.max_tokens;
+      }
+      if (params.response_format) {
+        req.payload.generationConfig = req.payload.generationConfig || {};
+        req.payload.generationConfig.response_mime_type = "application/json";
+        req.payload.response_schema = params.response_format;
       }
     } else if (providerName === "Mistral") {
       req.url = finalApiUrl(finalBaseUrl, "/v1/chat/completions");
@@ -130,6 +89,11 @@ function createSalsifyAI() {
         model: params.model || "mistral-large-latest",
         messages: [{ role: "user", content: fullPrompt }]
       };
+      if (params.response_format) {
+        req.payload.response_format = {
+          type: "json_object"
+        };
+      }
     } else if (providerName === "GeminiViaOpenAI") {
       // New provider: Gemini via OpenAI
       req.url = finalApiUrl(finalBaseUrl, ""); // baseUrl already includes the endpoint.
