@@ -1,186 +1,220 @@
-/**
- * This module returns an object "SalsifyAI" that exposes provider-specific builder methods.
- * Each provider object includes chainable methods for configuration (setApiKey, setBaseUrl),
- * an addContext method to attach structured data to every prompt, and a callCompletion method
- * that supports simulation mode and a debug flag.
- *
- * This version is written in pure ES5 (synchronous, no Promises) and reuses the built request object.
- * It assumes that a synchronous web_request(url, method, payload, headers) function is available.
- */
-function createSalsifyAI() {
-
-  // A shared function to perform the web request using the built request object.
-  function performRequest(requestObject) {
-    return web_request(requestObject.url, requestObject.method, requestObject.payload, requestObject.headers);
+// Helper to correctly join a base URL with an endpoint path.
+function finalApiUrl(base, path) {
+  if (base.charAt(base.length - 1) === "/") {
+    base = base.substr(0, base.length - 1);
   }
-
-  // Build a request object based on the provider specifics.
-  function buildRequest(providerName, finalApiKey, finalBaseUrl, fullPrompt, params) {
-    var req = {};
-    if (providerName === "OpenAI") {
-      req.url = finalApiUrl(finalBaseUrl, "/chat/completions");
-      req.method = "POST";
-      req.headers = { "Authorization": "Bearer " + finalApiKey, "Content-Type": "application/json" };
-      req.payload = {
-        "model": params.model || "gpt-4",
-        "messages": [{ "role": "user", "content": fullPrompt }],
-        "max_tokens": params.max_tokens || 1000
-      };
-    } else if (providerName === "Anthropic") {
-      // Updated for Claude per your curl:
-      req.url = finalApiUrl(finalApiKey, finalBaseUrl, "/v1/messages"); // using finalApiUrl to join base and path
-      req.url = finalApiUrl(finalBaseUrl, "/v1/messages");
-      req.method = "POST";
-      req.headers = {
-        "x-api-key": finalApiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json"
-      };
-      req.payload = {
-        "model": params.model || "claude-3-5-sonnet-20241022",
-        "max_tokens": params.max_tokens || 1024,
-        "messages": [{ "role": "user", "content": fullPrompt }]
-      };
-    } else if (providerName === "Gemini") {
-      req.url = finalApiUrl(finalBaseUrl, "") + "?key=" + finalApiKey;
-      req.method = "POST";
-      req.headers = { "Content-Type": "application/json" };
-      req.payload = {
-        "contents": [{
-          "parts": [{ "text": fullPrompt }]
-        }]
-      };
-      if (params.maxOutputTokens) {
-        req.payload.maxOutputTokens = params.maxOutputTokens;
-      }
-    } else if (providerName === "Mistral") {
-      req.url = finalApiUrl(finalBaseUrl, "/v1/chat/completions");
-      req.method = "POST";
-      req.headers = {
-        "Authorization": "Bearer " + finalApiKey,
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      };
-      req.payload = {
-        "model": params.model || "mistral-large-latest",
-        "messages": [{ "role": "user", "content": fullPrompt }]
-      };
-    }
-    return req;
-  }
-
-  // Helper to correctly join base URLs with endpoint paths.
-  function finalApiUrl(base, path) {
-    if (base.charAt(base.length - 1) === "/") {
-      base = base.substr(0, base.length - 1);
-    }
-    return base + path;
-  }
-
-  // Factory function to create a provider-specific object.
-  function createProvider(providerName, defaultBaseUrl, apiKey, baseUrl) {
-    var finalApiKey = apiKey || "";
-    var finalBaseUrl = baseUrl || defaultBaseUrl;
-    var contexts = [];
-
-    function setApiKey(key) {
-      finalApiKey = key;
-      return providerObj;
-    }
-
-    function setBaseUrl(url) {
-      finalBaseUrl = url;
-      return providerObj;
-    }
-
-    function addContext(noun, data) {
-      var dataString = (typeof data === "object") ? JSON.stringify(data, null, 2) : String(data);
-      var contextStr = "~~~~BEGIN " + noun + "~~~~\n" + dataString + "\n~~~~END " + noun + "~~~~";
-      contexts.push(contextStr);
-      return providerObj;
-    }
-
-    function extractContent(response) {
-      if (providerName === "OpenAI") {
-        if (response.choices && response.choices.length > 0 && response.choices[0].message) {
-          return response.choices[0].message.content;
-        }
-      } else if (providerName === "Anthropic") {
-        // For Anthropic, return: response.content[0][ response.content[0].type ]
-        if (response.content && response.content.length > 0 && response.content[0] && response.content[0].type) {
-          return response.content[0][response.content[0].type] || "";
-        }
-        return "";
-      } else if (providerName === "Gemini") {
-        if (response.candidates && response.candidates.length > 0) {
-          var candidate = response.candidates[0];
-          if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-            return candidate.content.parts[0].text;
-          }
-        }
-        return "";
-      } else if (providerName === "Mistral") {
-        // For Mistral, extract from choices[0].message.content
-        if (response.choices && response.choices.length > 0 && response.choices[0].message) {
-          return response.choices[0].message.content;
-        }
-        return "";
-      }
-      return "";
-    }
-
-    // Synchronous callCompletion function.
-    // If params.simulate is true, it returns the request object that would be sent.
-    function callCompletion(prompt, params) {
-      if (!finalApiKey) {
-        throw new Error("No API key set for " + providerName + ".");
-      }
-      params = params || {};
-      var debug = params.debug || false;
-      var simulate = params.simulate || false;
-      var fullPrompt = (contexts.length > 0 ? contexts.join("\n") + "\n" : "") + prompt;
-      var requestObject = buildRequest(providerName, finalApiKey, finalBaseUrl, fullPrompt, params);
-      if (simulate) {
-        return requestObject;
-      }
-      var response = performRequest(requestObject);
-      var content = extractContent(response);
-      if (debug) {
-        return {
-          prompt: fullPrompt,
-          request: requestObject,
-          rawResponse: response,
-          content: content
-        };
-      } else {
-        return content;
-      }
-    }
-
-    var providerObj = {
-      setApiKey: setApiKey,
-      setBaseUrl: setBaseUrl,
-      addContext: addContext,
-      callCompletion: callCompletion
-    };
-
-    return providerObj;
-  }
-
-  return {
-    openAIProvider: function(apiKey, baseUrl) {
-      return createProvider("OpenAI", "https://api.openai.com/v1", apiKey, baseUrl);
-    },
-    anthropicProvider: function(apiKey, baseUrl) {
-      return createProvider("Anthropic", "https://api.anthropic.com", apiKey, baseUrl);
-    },
-    geminiProvider: function(apiKey, baseUrl) {
-      return createProvider("Gemini", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", apiKey, baseUrl);
-    },
-    mistralProvider: function(apiKey, baseUrl) {
-      return createProvider("Mistral", "https://api.mistral.ai", apiKey, baseUrl);
-    }
-  };
+  return base + path;
 }
 
-createSalsifyAI();
+/**
+ * Base Provider "class" – defines common properties and methods.
+ */
+function Provider(apiKey, baseUrl) {
+  this.apiKey = apiKey || "";
+  this.baseUrl = baseUrl || "";
+  this.contexts = [];
+}
+
+Provider.prototype.setApiKey = function(key) {
+  this.apiKey = key;
+  return this;
+};
+
+Provider.prototype.setBaseUrl = function(url) {
+  this.baseUrl = url;
+  return this;
+};
+
+Provider.prototype.addContext = function(noun, data) {
+  var dataString = (typeof data === "object") ? JSON.stringify(data, null, 2) : String(data);
+  var contextStr = "~~~~BEGIN " + noun + "~~~~\n" + dataString + "\n~~~~END " + noun + "~~~~";
+  this.contexts.push(contextStr);
+  return this;
+};
+
+// Abstract: must be implemented in subclasses.
+Provider.prototype.buildRequest = function(fullPrompt, params) {
+  throw new Error("buildRequest not implemented");
+};
+
+// Abstract: must be implemented in subclasses.
+Provider.prototype.extractContent = function(response) {
+  throw new Error("extractContent not implemented");
+};
+
+Provider.prototype.callCompletion = function(prompt, params) {
+  if (!this.apiKey) {
+    throw new Error("No API key set.");
+  }
+  params = params || {};
+  var debug = params.debug || false;
+  var simulate = params.simulate || false;
+  var fullPrompt = (this.contexts.length > 0 ? this.contexts.join("\n") + "\n" : "") + prompt;
+  var requestObject = this.buildRequest(fullPrompt, params);
+
+  if (simulate) {
+    return requestObject;
+  }
+
+  // Use the synchronous web_request function (assumed to be defined).
+  var response = web_request(requestObject.url, requestObject.method, requestObject.payload, requestObject.headers);
+  var content = this.extractContent(response);
+
+  if (debug) {
+    return {
+      prompt: fullPrompt,
+      request: requestObject,
+      rawResponse: response,
+      content: content
+    };
+  }
+  return content;
+};
+
+/* ===================== Discrete Provider Implementations ===================== */
+
+// OpenAIProvider
+function OpenAIProvider(apiKey, baseUrl) {
+  Provider.call(this, apiKey, baseUrl || "https://api.openai.com/v1");
+}
+OpenAIProvider.prototype = Object.create(Provider.prototype);
+OpenAIProvider.prototype.constructor = OpenAIProvider;
+
+OpenAIProvider.prototype.buildRequest = function(fullPrompt, params) {
+  return {
+    url: finalApiUrl(this.baseUrl, "/chat/completions"),
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + this.apiKey,
+      "Content-Type": "application/json"
+    },
+    payload: {
+      model: params.model || "gpt-4",
+      messages: [{ role: "user", content: fullPrompt }],
+      max_tokens: params.max_tokens || 1000
+    }
+  };
+};
+
+OpenAIProvider.prototype.extractContent = function(response) {
+  if (response.choices && response.choices.length > 0 && response.choices[0].message) {
+    return response.choices[0].message.content;
+  }
+  return "";
+};
+
+// AnthropicProvider (Claude)
+function AnthropicProvider(apiKey, baseUrl) {
+  Provider.call(this, apiKey, baseUrl || "https://api.anthropic.com");
+}
+AnthropicProvider.prototype = Object.create(Provider.prototype);
+AnthropicProvider.prototype.constructor = AnthropicProvider;
+
+AnthropicProvider.prototype.buildRequest = function(fullPrompt, params) {
+  return {
+    url: finalApiUrl(this.baseUrl, "/v1/messages"),
+    method: "POST",
+    headers: {
+      "x-api-key": this.apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json"
+    },
+    payload: {
+      model: params.model || "claude-3-5-sonnet-20241022",
+      max_tokens: params.max_tokens || 1024,
+      messages: [{ role: "user", content: fullPrompt }]
+    }
+  };
+};
+
+AnthropicProvider.prototype.extractContent = function(response) {
+  // Instead of looping, return response.content[0][ response.content[0].type ]
+  if (response.content && response.content.length > 0 && response.content[0] && response.content[0].type) {
+    return response.content[0][response.content[0].type] || "";
+  }
+  return "";
+};
+
+// GeminiProvider
+function GeminiProvider(apiKey, baseUrl) {
+  Provider.call(this, apiKey, baseUrl || "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
+}
+GeminiProvider.prototype = Object.create(Provider.prototype);
+GeminiProvider.prototype.constructor = GeminiProvider;
+
+GeminiProvider.prototype.buildRequest = function(fullPrompt, params) {
+  var url = finalApiUrl(this.baseUrl, "") + "?key=" + this.apiKey;
+  var payload = {
+    contents: [{
+      parts: [{ text: fullPrompt }]
+    }]
+  };
+  if (params.maxOutputTokens) {
+    payload.maxOutputTokens = params.maxOutputTokens;
+  }
+  return {
+    url: url,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    payload: payload
+  };
+};
+
+GeminiProvider.prototype.extractContent = function(response) {
+  if (response.candidates && response.candidates.length > 0) {
+    var candidate = response.candidates[0];
+    if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+      return candidate.content.parts[0].text;
+    }
+  }
+  return "";
+};
+
+// MistralProvider
+function MistralProvider(apiKey, baseUrl) {
+  Provider.call(this, apiKey, baseUrl || "https://api.mistral.ai");
+}
+MistralProvider.prototype = Object.create(Provider.prototype);
+MistralProvider.prototype.constructor = MistralProvider;
+
+MistralProvider.prototype.buildRequest = function(fullPrompt, params) {
+  return {
+    url: finalApiUrl(this.baseUrl, "/v1/chat/completions"),
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + this.apiKey,
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    payload: {
+      model: params.model || "mistral-large-latest",
+      messages: [{ role: "user", content: fullPrompt }]
+    }
+  };
+};
+
+MistralProvider.prototype.extractContent = function(response) {
+  if (response.choices && response.choices.length > 0 && response.choices[0].message) {
+    return response.choices[0].message.content;
+  }
+  return "";
+};
+
+// ==================== SalsifyAI Factory ====================
+
+var SalsifyAI = {
+  openAIProvider: function(apiKey, baseUrl) {
+    return new OpenAIProvider(apiKey, baseUrl);
+  },
+  anthropicProvider: function(apiKey, baseUrl) {
+    return new AnthropicProvider(apiKey, baseUrl);
+  },
+  geminiProvider: function(apiKey, baseUrl) {
+    return new GeminiProvider(apiKey, baseUrl);
+  },
+  mistralProvider: function(apiKey, baseUrl) {
+    return new MistralProvider(apiKey, baseUrl);
+  }
+};
+
+SalsifyAI;
