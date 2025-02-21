@@ -74,8 +74,8 @@ function createSalsifyAI() {
       }
       if (params.response_format) {
         req.payload.generationConfig = req.payload.generationConfig || {};
-        req.payload.generationConfig.response_mime_type = "application/json";
-        req.payload.response_schema = params.response_format;
+        req.payload.generationConfig.responseMimeType = "application/json";
+        req.payload.responseSchema = params.response_format;
       }
     } else if (providerName === "Mistral") {
       req.url = finalApiUrl(finalBaseUrl, "/v1/chat/completions");
