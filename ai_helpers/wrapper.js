@@ -22,6 +22,25 @@ function createSalsifyAI() {
     return base + path;
   }
 
+  function convertResponseFormatForGemini(responseFormat) {
+    // Ensure the input is an object.
+    if (typeof responseFormat !== "object" || responseFormat === null) {
+      return responseFormat;
+    }
+    // If a "schema" property exists, use it.
+    if (responseFormat.hasOwnProperty("schema")) {
+      // Deep copy the schema to avoid modifying the original.
+      var newSchema = JSON.parse(JSON.stringify(responseFormat.schema));
+      // Remove the "additionalProperties" field if it exists.
+      if (newSchema.hasOwnProperty("additionalProperties")) {
+        delete newSchema.additionalProperties;
+      }
+      return newSchema;
+    }
+    // Otherwise, return the original object.
+    return responseFormat;
+  }
+
   // Simple validator function assumed to be defined elsewhere.
   // function validateResponseFormat(respFormat) { ... }
 
@@ -75,7 +94,7 @@ function createSalsifyAI() {
       if (params.response_format) {
         req.payload.generationConfig = req.payload.generationConfig || {};
         req.payload.generationConfig.responseMimeType = "application/json";
-        req.payload.generationConfig.responseSchema = params.response_format;
+        req.payload.generationConfig.responseSchema = convertResponseFormatForGemini(params.response_format);
       }
     } else if (providerName === "Mistral") {
       req.url = finalApiUrl(finalBaseUrl, "/v1/chat/completions");
