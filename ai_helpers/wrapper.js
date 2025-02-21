@@ -7,180 +7,216 @@
  * This version is written in pure ES5 (synchronous, no Promises) and reuses the built request object.
  * It assumes that a synchronous web_request(url, method, payload, headers) function is available.
  */
-function createSalsifyAI() {
+ // Helper function to join a base URL with an endpoint path.
+ function finalApiUrl(base, path) {
+   if (base.charAt(base.length - 1) === "/") {
+     base = base.substr(0, base.length - 1);
+   }
+   return base + path;
+ }
 
-  // A shared function to perform the web request using the built request object.
-  function performRequest(requestObject) {
-    return web_request(requestObject.url, requestObject.method, requestObject.payload, requestObject.headers);
-  }
+ // A factory function that creates a provider object using closures.
+ function createProvider(providerName, apiKey, baseUrl, buildRequestFn, extractContentFn) {
+   var _apiKey = apiKey || "";
+   var _baseUrl = baseUrl || "";
+   var _contexts = [];
 
-  // Build a request object based on the provider specifics.
-  function buildRequest(providerName, finalApiKey, finalBaseUrl, fullPrompt, params) {
-    var req = {};
-    if (providerName === "OpenAI") {
-      req.url = finalApiUrl(finalBaseUrl, "/chat/completions");
-      req.method = "POST";
-      req.headers = { "Authorization": "Bearer " + finalApiKey, "Content-Type": "application/json" };
-      req.payload = {
-        "model": params.model || "gpt-4",
-        "messages": [{ "role": "user", "content": fullPrompt }],
-        "max_tokens": params.max_tokens || 1000
-      };
-    } else if (providerName === "Anthropic") {
-      // Updated for Claude per your curl:
-      req.url = finalApiUrl(finalApiKey, finalBaseUrl, "/v1/messages"); // using finalApiUrl to join base and path
-      req.url = finalApiUrl(finalBaseUrl, "/v1/messages");
-      req.method = "POST";
-      req.headers = {
-        "x-api-key": finalApiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json"
-      };
-      req.payload = {
-        "model": params.model || "claude-3-5-sonnet-20241022",
-        "max_tokens": params.max_tokens || 1024,
-        "messages": [{ "role": "user", "content": fullPrompt }]
-      };
-    } else if (providerName === "Gemini") {
-      req.url = finalApiUrl(finalBaseUrl, "") + "?key=" + finalApiKey;
-      req.method = "POST";
-      req.headers = { "Content-Type": "application/json" };
-      req.payload = {
-        "contents": [{
-          "parts": [{ "text": fullPrompt }]
-        }]
-      };
-      if (params.maxOutputTokens) {
-        req.payload.maxOutputTokens = params.maxOutputTokens;
-      }
-    } else if (providerName === "Mistral") {
-      req.url = finalApiUrl(finalBaseUrl, "/v1/chat/completions");
-      req.method = "POST";
-      req.headers = {
-        "Authorization": "Bearer " + finalApiKey,
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      };
-      req.payload = {
-        "model": params.model || "mistral-large-latest",
-        "messages": [{ "role": "user", "content": fullPrompt }]
-      };
-    }
-    return req;
-  }
+   return {
+     setApiKey: function(key) {
+       _apiKey = key;
+       return this;
+     },
+     setBaseUrl: function(url) {
+       _baseUrl = url;
+       return this;
+     },
+     addContext: function(noun, data) {
+       var dataString = (typeof data === "object") ? JSON.stringify(data, null, 2) : String(data);
+       var contextStr = "~~~~BEGIN " + noun + "~~~~\n" + dataString + "\n~~~~END " + noun + "~~~~";
+       _contexts.push(contextStr);
+       return this;
+     },
+     callCompletion: function(prompt, params) {
+       params = params || {};
+       var debug = params.debug || false;
+       var simulate = params.simulate || false;
+       var fullPrompt = (_contexts.length > 0 ? _contexts.join("\n") + "\n" : "") + prompt;
 
-  // Helper to correctly join base URLs with endpoint paths.
-  function finalApiUrl(base, path) {
-    if (base.charAt(base.length - 1) === "/") {
-      base = base.substr(0, base.length - 1);
-    }
-    return base + path;
-  }
+       // If a response_format option is provided, adjust the prompt/payload.
+       if (params.response_format) {
+         if (providerName === "OpenAI") {
+           // For OpenAI, we'll include response_format in the payload (handled by buildRequestFn).
+         } else {
+           // For other providers, prepend a directive that instructs the model to output raw JSON.
+           var directive = "Response Schema: " + JSON.stringify(params.response_format) + "\n" +
+                           "Directive: Please output only the raw JSON (no markdown, explanation, or commentary).";
+           fullPrompt = directive + "\n" + fullPrompt;
+         }
+       }
 
-  // Factory function to create a provider-specific object.
-  function createProvider(providerName, defaultBaseUrl, apiKey, baseUrl) {
-    var finalApiKey = apiKey || "";
-    var finalBaseUrl = baseUrl || defaultBaseUrl;
-    var contexts = [];
+       var requestObject = buildRequestFn(_apiKey, _baseUrl, fullPrompt, params);
+       if (simulate) {
+          return requestObject;
+       }
+       var response = web_request(requestObject.url, requestObject.method, requestObject.payload, requestObject.headers);
+       var content = extractContentFn(response);
 
-    function setApiKey(key) {
-      finalApiKey = key;
-      return providerObj;
-    }
+       // If response_format was provided, try to JSON.parse the extracted content.
+       if (params.response_format) {
+         try {
+           content = JSON.parse(content);
+         } catch (e) {
+           // Optionally, you can throw an error or log a warning.
+           // For now, we simply return the original string content.
+         }
+       }
 
-    function setBaseUrl(url) {
-      finalBaseUrl = url;
-      return providerObj;
-    }
+       if (debug) {
+          return {
+            prompt: fullPrompt,
+            request: requestObject,
+            rawResponse: response,
+            content: content
+          };
+       }
+       return content;
+     }
+   };
+ }
 
-    function addContext(noun, data) {
-      var dataString = (typeof data === "object") ? JSON.stringify(data, null, 2) : String(data);
-      var contextStr = "~~~~BEGIN " + noun + "~~~~\n" + dataString + "\n~~~~END " + noun + "~~~~";
-      contexts.push(contextStr);
-      return providerObj;
-    }
+ /* ===================== SalsifyAI Factory ===================== */
 
-    function extractContent(response) {
-      if (providerName === "OpenAI") {
-        if (response.choices && response.choices.length > 0 && response.choices[0].message) {
-          return response.choices[0].message.content;
-        }
-      } else if (providerName === "Anthropic") {
-        // For Anthropic, return: response.content[0][ response.content[0].type ]
-        if (response.content && response.content.length > 0 && response.content[0] && response.content[0].type) {
-          return response.content[0][response.content[0].type] || "";
-        }
-        return "";
-      } else if (providerName === "Gemini") {
-        if (response.candidates && response.candidates.length > 0) {
-          var candidate = response.candidates[0];
-          if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-            return candidate.content.parts[0].text;
-          }
-        }
-        return "";
-      } else if (providerName === "Mistral") {
-        // For Mistral, extract from choices[0].message.content
-        if (response.choices && response.choices.length > 0 && response.choices[0].message) {
-          return response.choices[0].message.content;
-        }
-        return "";
-      }
-      return "";
-    }
+ var SalsifyAI = {
+   openAIProvider: function(apiKey, baseUrl) {
+     return createProvider(
+       "OpenAI",
+       apiKey,
+       baseUrl || "https://api.openai.com/v1",
+       // Inline buildRequest function for OpenAI:
+       function(apiKey, baseUrl, fullPrompt, params) {
+         var payload = {
+           model: params.model || "gpt-4",
+           messages: [{ role: "user", content: fullPrompt }],
+           max_tokens: params.max_tokens || 1000
+         };
+         if (params.response_format) {
+           payload.response_format = params.response_format;
+         }
+         return {
+           url: finalApiUrl(baseUrl, "/chat/completions"),
+           method: "POST",
+           headers: {
+             "Authorization": "Bearer " + apiKey,
+             "Content-Type": "application/json"
+           },
+           payload: payload
+         };
+       },
+       // Inline extractContent function for OpenAI:
+       function(response) {
+         if (response.choices && response.choices.length > 0 && response.choices[0].message) {
+           return response.choices[0].message.content;
+         }
+         return "";
+       }
+     );
+   },
+   anthropicProvider: function(apiKey, baseUrl) {
+     return createProvider(
+       "Anthropic",
+       apiKey,
+       baseUrl || "https://api.anthropic.com",
+       // Inline buildRequest function for Anthropic (Claude):
+       function(apiKey, baseUrl, fullPrompt, params) {
+         return {
+           url: finalApiUrl(baseUrl, "/v1/messages"),
+           method: "POST",
+           headers: {
+             "x-api-key": apiKey,
+             "anthropic-version": "2023-06-01",
+             "Content-Type": "application/json"
+           },
+           payload: {
+             model: params.model || "claude-3-5-sonnet-20241022",
+             max_tokens: params.max_tokens || 1024,
+             messages: [{ role: "user", content: fullPrompt }]
+           }
+         };
+       },
+       // Inline extractContent function for Anthropic:
+       function(response) {
+         if (response.content && response.content.length > 0 && response.content[0] && response.content[0].type) {
+           return response.content[0][response.content[0].type] || "";
+         }
+         return "";
+       }
+     );
+   },
+   geminiProvider: function(apiKey, baseUrl) {
+     return createProvider(
+       "Gemini",
+       apiKey,
+       baseUrl || "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+       // Inline buildRequest function for Gemini:
+       function(apiKey, baseUrl, fullPrompt, params) {
+         var url = finalApiUrl(baseUrl, "") + "?key=" + apiKey;
+         var payload = {
+           contents: [{
+             parts: [{ text: fullPrompt }]
+           }]
+         };
+         if (params.maxOutputTokens) {
+           payload.maxOutputTokens = params.maxOutputTokens;
+         }
+         return {
+           url: url,
+           method: "POST",
+           headers: { "Content-Type": "application/json" },
+           payload: payload
+         };
+       },
+       // Inline extractContent function for Gemini:
+       function(response) {
+         if (response.candidates && response.candidates.length > 0) {
+           var candidate = response.candidates[0];
+           if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+             return candidate.content.parts[0].text;
+           }
+         }
+         return "";
+       }
+     );
+   },
+   mistralProvider: function(apiKey, baseUrl) {
+     return createProvider(
+       "Mistral",
+       apiKey,
+       baseUrl || "https://api.mistral.ai",
+       // Inline buildRequest function for Mistral:
+       function(apiKey, baseUrl, fullPrompt, params) {
+         return {
+           url: finalApiUrl(baseUrl, "/v1/chat/completions"),
+           method: "POST",
+           headers: {
+             "Authorization": "Bearer " + apiKey,
+             "Content-Type": "application/json",
+             "Accept": "application/json"
+           },
+           payload: {
+             model: params.model || "mistral-large-latest",
+             messages: [{ role: "user", content: fullPrompt }]
+           }
+         };
+       },
+       // Inline extractContent function for Mistral:
+       function(response) {
+         if (response.choices && response.choices.length > 0 && response.choices[0].message) {
+           return response.choices[0].message.content;
+         }
+         return "";
+       }
+     );
+   }
+ };
 
-    // Synchronous callCompletion function.
-    // If params.simulate is true, it returns the request object that would be sent.
-    function callCompletion(prompt, params) {
-      if (!finalApiKey) {
-        throw new Error("No API key set for " + providerName + ".");
-      }
-      params = params || {};
-      var debug = params.debug || false;
-      var simulate = params.simulate || false;
-      var fullPrompt = (contexts.length > 0 ? contexts.join("\n") + "\n" : "") + prompt;
-      var requestObject = buildRequest(providerName, finalApiKey, finalBaseUrl, fullPrompt, params);
-      if (simulate) {
-        return requestObject;
-      }
-      var response = performRequest(requestObject);
-      var content = extractContent(response);
-      if (debug) {
-        return {
-          prompt: fullPrompt,
-          request: requestObject,
-          rawResponse: response,
-          content: content
-        };
-      } else {
-        return content;
-      }
-    }
-
-    var providerObj = {
-      setApiKey: setApiKey,
-      setBaseUrl: setBaseUrl,
-      addContext: addContext,
-      callCompletion: callCompletion
-    };
-
-    return providerObj;
-  }
-
-  return {
-    openAIProvider: function(apiKey, baseUrl) {
-      return createProvider("OpenAI", "https://api.openai.com/v1", apiKey, baseUrl);
-    },
-    anthropicProvider: function(apiKey, baseUrl) {
-      return createProvider("Anthropic", "https://api.anthropic.com", apiKey, baseUrl);
-    },
-    geminiProvider: function(apiKey, baseUrl) {
-      return createProvider("Gemini", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", apiKey, baseUrl);
-    },
-    mistralProvider: function(apiKey, baseUrl) {
-      return createProvider("Mistral", "https://api.mistral.ai", apiKey, baseUrl);
-    }
-  };
-}
-
-createSalsifyAI();
+SalsifyAI
