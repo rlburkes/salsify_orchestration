@@ -1,6 +1,6 @@
 /**
  * This module returns an object "SalsifyAI" that exposes provider-specific builder methods.
- * Each provider object includes chainable methods for configuration (e.g. setApiKey, setBaseUrl),
+ * Each provider object includes chainable methods for configuration (setApiKey, setBaseUrl),
  * an addContext method to attach structured data to every prompt, and a callCompletion method that
  * supports a debug flag.
  *
@@ -35,6 +35,7 @@ function createSalsifyAI() {
       return providerObj;
     }
 
+    // Updated extractContent to handle Gemini's response structure.
     function extractContent(response) {
       if (providerName === "OpenAI") {
         if (response.choices && response.choices.length > 0 && response.choices[0].message) {
@@ -42,7 +43,15 @@ function createSalsifyAI() {
         }
       } else if (providerName === "Anthropic") {
         return response.completion || "";
-      } else if (providerName === "Gemini" || providerName === "Mistral") {
+      } else if (providerName === "Gemini") {
+        if (response.candidates && response.candidates.length > 0) {
+          var candidate = response.candidates[0];
+          if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+            return candidate.content.parts[0].text;
+          }
+        }
+        return "";
+      } else if (providerName === "Mistral") {
         return response.completion || response.text || "";
       }
       return "";
@@ -105,9 +114,8 @@ function createSalsifyAI() {
     return web_request(url, "POST", payload, headers);
   }
 
-  // Updated Gemini call using the quickstart format.
+  // Gemini call adjusted per quickstart with API key as query param.
   function callGemini(apiKey, baseUrl, prompt, params) {
-    // Construct the URL with the API key as a query parameter.
     var url = baseUrl + "?key=" + apiKey;
     var headers = {
       "Content-Type": "application/json"
@@ -117,7 +125,6 @@ function createSalsifyAI() {
         "parts": [{"text": prompt}]
       }]
     };
-    // Optionally add Gemini-specific parameters (e.g., maxOutputTokens) if provided.
     if (params.maxOutputTokens) {
       payload.maxOutputTokens = params.maxOutputTokens;
     }
@@ -144,7 +151,6 @@ function createSalsifyAI() {
     anthropicProvider: function(apiKey, baseUrl) {
       return createProvider("Anthropic", "https://api.anthropic.com", apiKey, baseUrl, callAnthropic);
     },
-    // Updated default base URL for Gemini.
     geminiProvider: function(apiKey, baseUrl) {
       return createProvider("Gemini", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", apiKey, baseUrl, callGemini);
     },
