@@ -22,6 +22,55 @@ function createSalsifyAI() {
     return base + path;
   }
 
+  function validateResponseFormat(respFormat) {
+    var errors = [];
+
+    // Check that respFormat is an object.
+    if (typeof respFormat !== "object" || respFormat === null) {
+      errors.push("Response format must be a non-null object.");
+      return errors;
+    }
+
+    // Check for "name".
+    if (!respFormat.hasOwnProperty("name")) {
+      errors.push("Missing 'name' property.");
+    }
+
+    // Check that "strict" is true.
+    if (respFormat.strict !== true) {
+      errors.push("'strict' property must be true.");
+    }
+
+    // Check for a "schema" property.
+    if (!respFormat.hasOwnProperty("schema") || typeof respFormat.schema !== "object" || respFormat.schema === null) {
+      errors.push("Missing or invalid 'schema' property.");
+    } else {
+      var schema = respFormat.schema;
+
+      // Check that schema.type is "object".
+      if (schema.type !== "object") {
+        errors.push("Schema 'type' must be 'object'.");
+      }
+
+      // Check that schema.properties exists and is an object.
+      if (!schema.hasOwnProperty("properties") || typeof schema.properties !== "object" || schema.properties === null) {
+        errors.push("Schema must have a 'properties' object.");
+      }
+
+      // Check that schema.required exists and is an array.
+      if (!schema.hasOwnProperty("required") || !Array.isArray(schema.required)) {
+        errors.push("Schema must have a 'required' array.");
+      }
+
+      // Check that additionalProperties is explicitly false.
+      if (schema.additionalProperties !== false) {
+        errors.push("Schema 'additionalProperties' must be explicitly false.");
+      }
+    }
+
+    return errors;
+  }
+
   // Build a request object based on provider specifics.
   function buildRequest(providerName, finalApiKey, finalBaseUrl, fullPrompt, params) {
     var req = {};
@@ -170,6 +219,11 @@ function createSalsifyAI() {
         var directive = "----- RESPONSE WITH THIS SCHEMA: " + JSON.stringify(params.response_format) + "\n" +
                         "----- CRITICAL DIRECTIVE: Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary.";
         fullPrompt = directive + "\n" + fullPrompt;
+      } else if (params.response_format && providerSupportsJSON) {
+        var errors = validateResponseFormat(params.response_format);
+        if (errors.length > 0) {
+          return errors;
+        }
       }
 
       var requestObject = buildRequest(providerName, finalApiKey, finalBaseUrl, fullPrompt, params);
