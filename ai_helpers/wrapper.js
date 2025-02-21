@@ -2,159 +2,170 @@
  * This module returns an object "SalsifyAI" that exposes provider-specific builder methods.
  * Each provider object includes chainable methods for configuration (setApiKey, setBaseUrl),
  * an addContext method to attach structured data to every prompt, and a callCompletion method that
- * supports a debug flag.
+ * supports a simulation mode and a debug flag.
  *
- * Relies on a synchronous web_request(url, method, payload, headers) function provided by your environment.
+ * This version is written in pure ES5 (synchronous, no Promises) and reuses the built request object.
+ * It assumes that a synchronous web_request(url, method, payload, headers) function is available.
  */
- function createSalsifyAI() {
+function createSalsifyAI() {
 
-   function createProvider(providerName, defaultBaseUrl, apiKey, baseUrl, callFn) {
-     var finalApiKey = apiKey || "";
-     var finalBaseUrl = baseUrl || defaultBaseUrl;
-     var contexts = [];
+  // A shared function to perform the web request using the built request object.
+  function performRequest(requestObject) {
+    return web_request(requestObject.url, requestObject.method, requestObject.payload, requestObject.headers);
+  }
 
-     function setApiKey(key) {
-       finalApiKey = key;
-       return providerObj;
-     }
+  // Build a request object based on the provider specifics.
+  function buildRequest(providerName, finalApiKey, finalBaseUrl, fullPrompt, params) {
+    var req = {};
+    if (providerName === "OpenAI") {
+      req.url = finalApiUrl(finalBaseUrl, "/chat/completions");
+      req.method = "POST";
+      req.headers = { "Authorization": "Bearer " + finalApiKey, "Content-Type": "application/json" };
+      req.payload = {
+        "model": params.model || "gpt-4",
+        "messages": [{ "role": "user", "content": fullPrompt }],
+        "max_tokens": params.max_tokens || 1000
+      };
+    } else if (providerName === "Anthropic") {
+      req.url = finalApiUrl(finalBaseUrl, "/v1/complete");
+      req.method = "POST";
+      req.headers = { "Authorization": "Bearer " + finalApiKey, "Content-Type": "application/json" };
+      req.payload = {
+        "prompt": fullPrompt,
+        "max_tokens": params.max_tokens || 1000
+      };
+    } else if (providerName === "Gemini") {
+      // For Gemini, the API key is passed as a query parameter.
+      req.url = finalApiUrl(finalBaseUrl, "") + "?key=" + finalApiKey;
+      req.method = "POST";
+      req.headers = { "Content-Type": "application/json" };
+      req.payload = {
+        "contents": [{
+          "parts": [{ "text": fullPrompt }]
+        }]
+      };
+      if (params.maxOutputTokens) {
+        req.payload.maxOutputTokens = params.maxOutputTokens;
+      }
+    } else if (providerName === "Mistral") {
+      req.url = finalApiUrl(finalBaseUrl, "/v1/complete");
+      req.method = "POST";
+      req.headers = { "Authorization": "Bearer " + finalApiKey, "Content-Type": "application/json" };
+      req.payload = {
+        "prompt": fullPrompt,
+        "max_tokens": params.max_tokens || 1000
+      };
+    }
+    return req;
+  }
 
-     function setBaseUrl(url) {
-       finalBaseUrl = url;
-       return providerObj;
-     }
+  // Helper to correctly join base URLs with endpoint paths.
+  function finalApiUrl(base, path) {
+    // Remove any trailing slash from base
+    if (base.charAt(base.length - 1) === "/") {
+      base = base.substr(0, base.length - 1);
+    }
+    return base + path;
+  }
 
-     function addContext(noun, data) {
-       var dataString;
-       if (typeof data === "object") {
-         dataString = JSON.stringify(data, null, 2);
-       } else {
-         dataString = String(data);
-       }
-       var contextStr = "~~~~BEGIN " + noun + "~~~~\n" + dataString + "\n~~~~END " + noun + "~~~~";
-       contexts.push(contextStr);
-       return providerObj;
-     }
+  // Factory function to create a provider-specific object.
+  function createProvider(providerName, defaultBaseUrl, apiKey, baseUrl) {
+    var finalApiKey = apiKey || "";
+    var finalBaseUrl = baseUrl || defaultBaseUrl;
+    var contexts = [];
 
-     // Updated extractContent to handle Gemini's response structure.
-     function extractContent(response) {
-       if (providerName === "OpenAI") {
-         if (response.choices && response.choices.length > 0 && response.choices[0].message) {
-           return response.choices[0].message.content;
-         }
-       } else if (providerName === "Anthropic") {
-         return response.completion || "";
-       } else if (providerName === "Gemini") {
-         if (response.candidates && response.candidates.length > 0) {
-           var candidate = response.candidates[0];
-           if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-             return candidate.content.parts[0].text;
-           }
-         }
-         return "";
-       } else if (providerName === "Mistral") {
-         return response.completion || response.text || "";
-       }
-       return "";
-     }
+    function setApiKey(key) {
+      finalApiKey = key;
+      return providerObj;
+    }
 
-     function callCompletion(prompt, params) {
-       if (!finalApiKey) {
-         throw new Error("No API key set for " + providerName + ".");
-       }
-       params = params || {};
-       var debug = params.debug || false;
-       var fullPrompt = (contexts.length > 0 ? contexts.join("\n") + "\n" : "") + prompt;
-       var response = callFn(finalApiKey, finalBaseUrl, fullPrompt, params);
-       var content = extractContent(response);
-       if (debug) {
-         return {
-           prompt: fullPrompt,
-           rawResponse: response,
-           content: content
-         };
-       } else {
-         return content;
-       }
-     }
+    function setBaseUrl(url) {
+      finalApiUrl = url;
+      finalApiBaseUrl = url;
+      finalBaseUrl = url;
+      return providerObj;
+    }
 
-     var providerObj = {
-       setApiKey: setApiKey,
-       setBaseUrl: setBaseUrl,
-       addContext: addContext,
-       callCompletion: callCompletion
-     };
+    function addContext(noun, data) {
+      var dataString = (typeof data === "object") ? JSON.stringify(data, null, 2) : String(data);
+      var contextStr = "~~~~BEGIN " + noun + "~~~~\n" + dataString + "\n~~~~END " + noun + "~~~~";
+      contexts.push(contextStr);
+      return providerObj;
+    }
 
-     return providerObj;
-   }
+    function extractContent(response) {
+      if (providerName === "OpenAI") {
+        if (response.choices && response.choices.length > 0 && response.choices[0].message) {
+          return response.choices[0].message.content;
+        }
+      } else if (providerName === "Anthropic") {
+        return response.completion || "";
+      } else if (providerName === "Gemini") {
+        if (response.candidates && response.candidates.length > 0) {
+          var candidate = response.candidates[0];
+          if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+            return candidate.content.parts[0].text;
+          }
+        }
+        return "";
+      } else if (providerName === "Mistral") {
+        return response.completion || response.text || "";
+      }
+      return "";
+    }
 
-   function callOpenAI(apiKey, baseUrl, prompt, params) {
-     var url = baseUrl + "/chat/completions";
-     var headers = {
-       "Authorization": "Bearer " + apiKey,
-       "Content-Type": "application/json"
-     };
-     var payload = {
-       "model": params.model || "gpt-4",
-       "messages": [{ "role": "user", "content": prompt }],
-       "max_tokens": params.max_tokens || 1000
-     };
-     return web_request(url, "POST", payload, headers);
-   }
+    // Synchronous callCompletion function.
+    // If params.simulate is true, it returns the request object that would be sent.
+    function callCompletion(prompt, params) {
+      if (!finalApiKey) {
+        throw new Error("No API key set for " + providerName + ".");
+      }
+      params = params || {};
+      var debug = params.debug || false;
+      var simulate = params.simulate || false;
+      var fullPrompt = (contexts.length > 0 ? contexts.join("\n") + "\n" : "") + prompt;
+      var requestObject = buildRequest(providerName, finalApiKey, finalBaseUrl, fullPrompt, params);
+      if (simulate) {
+        return requestObject;
+      }
+      var response = performRequest(requestObject);
+      var content = extractContent(response);
+      if (debug) {
+        return {
+          prompt: fullPrompt,
+          request: requestObject,
+          rawResponse: response,
+          content: content
+        };
+      } else {
+        return content;
+      }
+    }
 
-   function callAnthropic(apiKey, baseUrl, prompt, params) {
-     var url = baseUrl + "/v1/complete";
-     var headers = {
-       "Authorization": "Bearer " + apiKey,
-       "Content-Type": "application/json"
-     };
-     var payload = {
-       "prompt": prompt,
-       "max_tokens": params.max_tokens || 1000
-     };
-     return web_request(url, "POST", payload, headers);
-   }
+    var providerObj = {
+      setApiKey: setApiKey,
+      setBaseUrl: setBaseUrl,
+      addContext: addContext,
+      callCompletion: callCompletion
+    };
 
-   // Gemini call adjusted per quickstart with API key as query param.
-   function callGemini(apiKey, baseUrl, prompt, params) {
-     var url = baseUrl + "?key=" + apiKey;
-     var headers = {
-       "Content-Type": "application/json"
-     };
-     var payload = {
-       "contents": [{
-         "parts": [{"text": prompt}]
-       }]
-     };
-     return web_request(url, "POST", payload, headers);
-   }
+    return providerObj;
+  }
 
-   function callMistral(apiKey, baseUrl, prompt, params) {
-     var url = baseUrl + "/v1/complete";
-     var headers = {
-       "Authorization": "Bearer " + apiKey,
-       "Content-Type": "application/json"
-     };
-     var payload = {
-       "prompt": prompt,
-       "max_tokens": params.max_tokens || 1000
-     };
-     return web_request(url, "POST", payload, headers);
-   }
+  return {
+    openAIProvider: function(apiKey, baseUrl) {
+      return createProvider("OpenAI", "https://api.openai.com/v1", apiKey, baseUrl);
+    },
+    anthropicProvider: function(apiKey, baseUrl) {
+      return createProvider("Anthropic", "https://api.anthropic.com", apiKey, baseUrl);
+    },
+    geminiProvider: function(apiKey, baseUrl) {
+      return createProvider("Gemini", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", apiKey, baseUrl);
+    },
+    mistralProvider: function(apiKey, baseUrl) {
+      return createProvider("Mistral", "https://api.mistral.com", apiKey, baseUrl);
+    }
+  };
+}
 
-   return {
-     openAIProvider: function(apiKey, baseUrl) {
-       return createProvider("OpenAI", "https://api.openai.com/v1", apiKey, baseUrl, callOpenAI);
-     },
-     anthropicProvider: function(apiKey, baseUrl) {
-       return createProvider("Anthropic", "https://api.anthropic.com", apiKey, baseUrl, callAnthropic);
-     },
-     geminiProvider: function(apiKey, baseUrl) {
-       return createProvider("Gemini", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", apiKey, baseUrl, callGemini);
-     },
-     mistralProvider: function(apiKey, baseUrl) {
-       return createProvider("Mistral", "https://api.mistral.com", apiKey, baseUrl, callMistral);
-     }
-   };
- }
-
- createSalsifyAI();
+createSalsifyAI();
