@@ -75,7 +75,7 @@ function createSalsifyAI() {
       if (params.response_format) {
         req.payload.generationConfig = req.payload.generationConfig || {};
         req.payload.generationConfig.responseMimeType = "application/json";
-        req.payload.responseSchema = params.response_format;
+        req.payload.generationConfig.responseSchema = params.response_format;
       }
     } else if (providerName === "Mistral") {
       req.url = finalApiUrl(finalBaseUrl, "/v1/chat/completions");
