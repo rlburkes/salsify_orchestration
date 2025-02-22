@@ -22,6 +22,21 @@ function createSalsifyAI() {
     return base + path;
   }
 
+  // Converts response format for Gemini provider.
+  function convertResponseFormatForGemini(responseFormat) {
+    if (typeof responseFormat !== "object" || responseFormat === null) {
+      return responseFormat;
+    }
+    if (responseFormat.hasOwnProperty("schema")) {
+      var newSchema = JSON.parse(JSON.stringify(responseFormat.schema));
+      if (newSchema.hasOwnProperty("additionalProperties")) {
+        delete newSchema.additionalProperties;
+      }
+      return newSchema;
+    }
+    return responseFormat;
+  }
+
   // Simple validator function assumed to be defined elsewhere.
   // function validateResponseFormat(respFormat) { ... }
 
@@ -75,8 +90,8 @@ function createSalsifyAI() {
         }
         if (params.response_format) {
           request.payload.generationConfig = request.payload.generationConfig || {};
-          request.payload.generationConfig.response_mime_type = "application/json";
-          request.payload.response_schema = params.response_format;
+          request.payload.generationConfig.responseMimeType = "application/json";
+          request.payload.responseSchema = convertResponseFormatForGemini(params.response_format);
         }
         break;
 
