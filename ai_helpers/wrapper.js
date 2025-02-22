@@ -91,7 +91,7 @@ function createSalsifyAI() {
         if (params.response_format) {
           request.payload.generationConfig = request.payload.generationConfig || {};
           request.payload.generationConfig.responseMimeType = "application/json";
-          request.payload.responseSchema = convertResponseFormatForGemini(params.response_format);
+          request.payload.generationConfig.responseSchema = convertResponseFormatForGemini(params.response_format);
         }
         break;
 
