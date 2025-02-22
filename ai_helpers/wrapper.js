@@ -37,6 +37,51 @@ function createSalsifyAI() {
     return responseFormat;
   }
 
+  function validateResponseFormat(respFormat) {
+    var errors = [];
+
+    // Check that respFormat is a non-null object.
+    if (typeof respFormat !== "object" || respFormat === null) {
+      errors.push("Response format must be a non-null object.");
+      return errors;
+    }
+
+    // Check for required properties and their types.
+    if (!respFormat.hasOwnProperty("name")) {
+      errors.push("Missing 'name' property.");
+    }
+
+    if (respFormat.strict !== true) {
+      errors.push("'strict' property must be true.");
+    }
+
+    // Validate the 'schema' property.
+    if (!respFormat.hasOwnProperty("schema") || typeof respFormat.schema !== "object" || respFormat.schema === null) {
+      errors.push("Missing or invalid 'schema' property.");
+    } else {
+      var schema = respFormat.schema;
+
+      // Validate schema properties.
+      if (schema.type !== "object") {
+        errors.push("Schema 'type' must be 'object'.");
+      }
+
+      if (!schema.hasOwnProperty("properties") || typeof schema.properties !== "object" || schema.properties === null) {
+        errors.push("Schema must have a 'properties' object.");
+      }
+
+      if (!schema.hasOwnProperty("required") || !Array.isArray(schema.required)) {
+        errors.push("Schema must have a 'required' array.");
+      }
+
+      if (schema.additionalProperties !== false) {
+        errors.push("Schema 'additionalProperties' must be explicitly false.");
+      }
+    }
+
+    return errors;
+  }
+
   // Simple validator function assumed to be defined elsewhere.
   // function validateResponseFormat(respFormat) { ... }
 
