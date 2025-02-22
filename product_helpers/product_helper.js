@@ -81,4 +81,5 @@ function createProductHelper(context) {
 
 // Assume the workflow context is available as "context" (provided by your environment).
 // Create the Product helper from the workflow context.
-var Product = createProductHelper(context);
+var productHelper = createProductHelper(context);
+productHelper;
