@@ -1,0 +1,19 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    libv8-node (18.19.0.0-arm64-darwin)
+    mini_racer (0.16.0)
+      libv8-node (~> 18.19.0.0)
+    power_assert (2.0.5)
+    test-unit (3.6.7)
+      power_assert
+
+PLATFORMS
+  arm64-darwin-21
+
+DEPENDENCIES
+  mini_racer
+  test-unit
+
+BUNDLED WITH
+   2.3.26
