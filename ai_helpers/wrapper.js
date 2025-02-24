@@ -2,7 +2,7 @@
  * This module returns an object "SalsifyAI" that exposes provider-specific builder methods.
  * Each provider object includes chainable methods for configuration (setApiKey, setBaseUrl),
  * an addContext method to attach structured data to every prompt, and a callCompletion method
- * that supports simulation mode, a debug flag, and a response_format option.
+ * that supports simulation mode (via debugPrompt), a debugResponse flag, and a response_format option.
  *
  * This version is written in pure ES5 (synchronous, no Promises) and assumes a synchronous
  * web_request(url, method, payload, headers) function is available.
@@ -11,7 +11,15 @@ function createSalsifyAI() {
 
   // A shared function to perform the web request using the built request object.
   function performRequest(requestObject) {
-    return web_request(requestObject.url, requestObject.method, requestObject.payload, requestObject.headers);
+    try {
+      if (requestObject.debugPrompt) {
+        return requestObject;
+      } else {
+        return web_request(requestObject.url, requestObject.method, requestObject.payload, requestObject.headers);
+      }
+    } catch (e) {
+      return { "status": "failure", "request": requestObject, "message": e };
+    }
   }
 
   // Helper to correctly join a base URL with an endpoint path.
@@ -82,19 +90,55 @@ function createSalsifyAI() {
     return errors;
   }
 
-  // Simple validator function assumed to be defined elsewhere.
-  // function validateResponseFormat(respFormat) { ... }
+  // Updated buildProviderMessage now includes providerName as first argument.
+  function buildProviderMessage(providerName, role, content) {
+    switch (providerName) {
+      case "Mistral":
+      case "Anthropic":
+      case "GeminiViaOpenAI":
+      case "OpenAI":
+        return [{ role: role, content: content }];
+      case "Gemini":
+        return [{ parts: [{ text: content }], role: "user" }];
+      default:
+        throw new Error("Unsupported provider: " + providerName);
+    }
+  }
 
-  // Build a request object based on provider specifics.
-  function buildRequest(providerName, apiKey, baseUrl, prompt, params) {
-    var request = {
+  function buildMessages(providerName, prompt) {
+    if (typeof prompt === "string") {
+      return buildProviderMessage(providerName, "user", prompt);
+    } else if (Array.isArray(prompt)) {
+      return prompt.map(function(item) {
+        if (Array.isArray(item) && item.length === 2) {
+          return { role: item[0], content: item[1] };
+        } else if (typeof item === "object" && item.hasOwnProperty("role") && item.hasOwnProperty("content")) {
+          return item;
+        } else {
+          throw new Error("Invalid message format: each message must be a [role, content] tuple or an object with role and content.");
+        }
+      });
+    } else {
+      throw new Error("Prompt must be a string or an array of messages or role/content tuples.");
+    }
+  }
+
+  function basePayload(params) {
+    return {
       url: '',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      payload: {}
+      payload: {},
+      debugPrompt: params.debugPrompt || false,
+      debugResponse: params.debugResponse || false
     };
+  }
+
+  // Build a request object based on provider specifics.
+  function buildRequest(providerName, apiKey, baseUrl, messages, params) {
+    var request = basePayload(params);
 
     switch (providerName) {
       case "OpenAI":
@@ -102,7 +146,7 @@ function createSalsifyAI() {
         request.headers.Authorization = "Bearer " + apiKey;
         request.payload = {
           model: params.model || "gpt-4o",
-          messages: [{ role: "user", content: prompt }],
+          messages: messages,
           max_tokens: params.max_tokens || 1000
         };
         if (params.response_format) {
@@ -120,14 +164,14 @@ function createSalsifyAI() {
         request.payload = {
           model: params.model || "claude-3-5-sonnet-20241022",
           max_tokens: params.max_tokens || 1024,
-          messages: [{ role: "user", content: prompt }]
+          messages: messages
         };
         break;
 
       case "Gemini":
         request.url = finalApiUrl(baseUrl, "") + "?key=" + apiKey;
         request.payload = {
-          contents: [{ parts: [{ text: prompt }] }]
+          contents: messages
         };
         if (params.max_tokens) {
           request.payload.generationConfig = request.payload.generationConfig || {};
@@ -146,7 +190,7 @@ function createSalsifyAI() {
         request.headers.Accept = "application/json";
         request.payload = {
           model: params.model || "mistral-large-latest",
-          messages: [{ role: "user", content: prompt }]
+          messages: messages
         };
         if (params.response_format) {
           request.payload.response_format = { type: "json_object" };
@@ -158,7 +202,7 @@ function createSalsifyAI() {
         request.headers.Authorization = "Bearer " + apiKey;
         request.payload = {
           model: params.model || "gemini-2.0-flash",
-          messages: [{ role: "user", content: prompt }],
+          messages: messages,
           max_tokens: params.max_tokens || 1000
         };
         if (params.response_format) {
@@ -205,20 +249,28 @@ function createSalsifyAI() {
         case "OpenAI":
         case "GeminiViaOpenAI":
           return response.choices && response.choices[0].message ? response.choices[0].message.content : "";
-
         case "Anthropic":
           return response.content && response.content[0] ? response.content[0][response.content[0].type] || "" : "";
-
         case "Gemini":
           var candidate = response.candidates && response.candidates[0];
           return candidate && candidate.content && candidate.content.parts[0] ? candidate.content.parts[0].text : "";
-
         case "Mistral":
           return response.choices && response.choices[0].message ? response.choices[0].message.content : "";
-
         default:
           return "";
       }
+    }
+
+    function extractJSON(content, coerceJSON) {
+      if (coerceJSON) {
+        try {
+          return JSON.parse(content);
+        } catch (e) {
+          // If parsing fails, leave content as is.
+          return content;
+        }
+      }
+      return content;
     }
 
     function callCompletion(prompt, params) {
@@ -226,45 +278,43 @@ function createSalsifyAI() {
         throw new Error("No API key set for " + providerName + ".");
       }
       params = params || {};
-      var debug = params.debug || false;
-      var simulate = params.simulate || false;
-      var fullPrompt = contexts.length > 0 ? contexts.join("\n") + "\n" + prompt : prompt;
 
-      if (params.response_format && !providerSupportsJSON) {
-        var directive = "----- RESPONSE WITH THIS SCHEMA: " + JSON.stringify(params.response_format) + "\n" +
-                        "----- CRITICAL DIRECTIVE: Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary.";
-        fullPrompt = directive + "\n" + fullPrompt;
-      } else if (params.response_format && providerSupportsJSON) {
-        var errors = validateResponseFormat(params.response_format);
-        if (errors.length > 0) {
-          return errors;
-        }
-      }
-
-      var requestObject = buildRequest(providerName, apiKey, baseUrl, fullPrompt, params);
-      if (simulate) {
-        return requestObject;
-      }
-      var response = performRequest(requestObject);
-      var content = extractContent(response);
+      var messages = buildMessages(providerName, prompt);
 
       if (params.response_format) {
-        try {
-          content = JSON.parse(content);
-        } catch (e) {
-          // If parsing fails, leave content as is.
+        if (providerSupportsJSON) {
+          var errors = validateResponseFormat(params.response_format);
+          if (errors.length > 0) {
+            return errors;
+          }
+        } else {
+          addContext("RESPOND WITH THIS SCHEMA", JSON.stringify(params.response_format));
+          addContext("RESPONSE DIRECTIVE", "Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary");
         }
       }
 
-      if (debug) {
-        return {
-          prompt: fullPrompt,
-          request: requestObject,
-          rawResponse: response,
-          content: content
-        };
+      if (contexts.length > 0) {
+        if (providerName === "Gemini") {
+          messages.unshift({ role: "user", parts: [ { text: contexts.join("\n") } ] });
+        } else {
+          messages.unshift({ role: "system", content: contexts.join("\n") });
+        }
       }
-      return content;
+
+      var requestObject = buildRequest(providerName, apiKey, baseUrl, messages, params);
+
+      var response = requestObject; // default to the request so we can debug
+      if (!requestObject.debugPrompt) {
+        response = performRequest(requestObject);
+      }
+
+      if (requestObject.debugResponse || requestObject.debugPrompt) {
+        return response;
+      } else {
+        response = extractJSON(extractContent(response), params.response_format || false);
+      }
+
+      return response;
     }
 
     var providerObj = {

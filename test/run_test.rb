@@ -115,7 +115,7 @@ class TestJSAbstractions < Test::Unit::TestCase
   def test_salsify_ai_openai_provider
     js_code = <<~JS
       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
-      var response = provider.callCompletion("Test prompt", {simulate: true, max_tokens: 150});
+      var response = provider.callCompletion("Test prompt", { debugPrompt: true, max_tokens: 150 });
       response;
     JS
     result = @ctx.eval(js_code)
@@ -127,12 +127,84 @@ class TestJSAbstractions < Test::Unit::TestCase
     assert_equal("Test prompt", messages[0]["content"], "Prompt message mismatch")
   end
 
+    # Test that using a string prompt with debugPrompt returns a correct request object.
+   def test_openai_debug_prompt_with_string
+     js_code = <<~JS
+       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
+       var response = provider.callCompletion("Simple prompt", { debugPrompt: true, max_tokens: 150 });
+       response;
+     JS
+     result = @ctx.eval(js_code)
+     assert_equal("https://api.openai.com/v1/chat/completions", result["url"], "OpenAI URL mismatch")
+     assert_equal("Bearer testkey", result["headers"]["Authorization"], "Authorization header mismatch")
+     assert_equal(150, result["payload"]["max_tokens"], "max_tokens value mismatch")
+     messages = result["payload"]["messages"]
+     assert(messages.is_a?(Array), "Messages should be an array")
+     # When a string prompt is provided, it should be converted to a single message with role 'user'
+     assert_equal("user", messages[0]["role"], "Default role should be 'user'")
+     assert_equal("Simple prompt", messages[0]["content"], "Message content mismatch")
+   end
+
+   # Test that using an array of message tuples returns the expected messages array.
+   def test_openai_debug_prompt_with_array
+     js_code = <<~JS
+       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
+       var response = provider.callCompletion([["assistant", "Hello"], ["user", "How are you?"]], { debugPrompt: true, max_tokens: 200 });
+       response;
+     JS
+     result = @ctx.eval(js_code)
+     messages = result["payload"]["messages"]
+     assert_equal(2, messages.length, "Expected 2 messages")
+     assert_equal("assistant", messages[0]["role"], "First message role should be 'assistant'")
+     assert_equal("Hello", messages[0]["content"], "First message content mismatch")
+     assert_equal("user", messages[1]["role"], "Second message role should be 'user'")
+     assert_equal("How are you?", messages[1]["content"], "Second message content mismatch")
+   end
+
+   # Test that adding context prepends a system message to the messages array.
+   def test_openai_with_context
+     js_code = <<~JS
+       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
+       provider.addContext("Greeting", { msg: "Hello World" });
+       var response = provider.callCompletion("Prompt with context", { debugPrompt: true });
+       response;
+     JS
+     result = @ctx.eval(js_code)
+     messages = result["payload"]["messages"]
+     assert_equal("system", messages[0]["role"], "First message should be a system message containing the context")
+     assert(messages[0]["content"].include?("~~~~BEGIN Greeting~~~~"), "Context message should include the 'Greeting' label")
+   end
+
+   # Test that debugResponse returns the raw API response (without content extraction).
+   def test_openai_debug_response
+     js_code = <<~JS
+       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
+       var response = provider.callCompletion("Test prompt", { debugResponse: true, max_tokens: 150 });
+       response;
+     JS
+     result = @ctx.eval(js_code)
+     # The dummy web_request returns an object with a "choices" key.
+     assert(result.has_key?("choices"), "Raw response should contain 'choices'")
+   end
+
+   # Test that an invalid response_format returns an error array.
+   def test_openai_invalid_response_format
+     js_code = <<~JS
+       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
+       var response = provider.callCompletion("Test prompt", { debugPrompt: true, response_format: {} });
+       response;
+     JS
+     result = @ctx.eval(js_code)
+     assert(result.is_a?(Array), "Expected an error array for invalid response_format")
+     assert(result.include?("Missing 'name' property."), "Expected error about missing 'name' property")
+   end
+
   def test_openai_response_format_validation
     # For providers supporting JSON (OpenAI and GeminiViaOpenAI), invalid response_format should return errors.
     js_code = <<~JS
       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
       // Supply an invalid response_format (missing required properties).
-      var result = provider.callCompletion("Test prompt", {simulate: true, response_format: {}});
+      var result = provider.callCompletion("Test prompt", {debugPrompt: true, response_format: {}});
       result;
     JS
     result = @ctx.eval(js_code)
@@ -144,7 +216,7 @@ class TestJSAbstractions < Test::Unit::TestCase
   def test_salsify_ai_anthropic_provider
     js_code = <<~JS
       var provider = SalsifyAI.anthropicProvider("anthrokey", "https://api.anthropic.com");
-      var response = provider.callCompletion("Anthropic test", {simulate: true});
+      var response = provider.callCompletion("Anthropic test", {debugPrompt: true});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -170,10 +242,33 @@ class TestJSAbstractions < Test::Unit::TestCase
     }
     js_code = <<~JS
       var provider = SalsifyAI.geminiProvider("geminikey", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
-      var response = provider.callCompletion("Gemini test", {simulate: true, max_tokens: 200, response_format: #{response_format.to_json}});
+      var response = provider.callCompletion("Gemini test", {debugPrompt: true, max_tokens: 200, response_format: #{response_format.to_json}});
       response;
     JS
     result = @ctx.eval(js_code)
+
+    messages = result["payload"]["contents"]
+    expected_messages = [
+      {
+        "parts": [{
+          "text": "~~~~BEGIN RESPOND WITH THIS SCHEMA~~~~\n"\
+                   "{\"name\":\"TestSchema\",\"strict\":false,\"schema\":{\"type\":\"object\",\"properties\":{\"test\":{\"type\":\"string\"}},\"required\":[\"test\"],\"additionalProperties\":false}}\n"\
+                   "~~~~END RESPOND WITH THIS SCHEMA~~~~\n"\
+                   "~~~~BEGIN RESPONSE DIRECTIVE~~~~\n"\
+                   "Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\n"\
+                   "~~~~END RESPONSE DIRECTIVE~~~~"\
+          }],
+        "role": "user"
+      },
+      {
+        "parts": [{
+          "text": "Gemini test"
+        }],
+        "role": "user"
+      }
+    ]
+    assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
+
     # The URL should include the API key as a query parameter.
     expected_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=geminikey"
     assert_equal(expected_url, result["url"], "Gemini URL mismatch")
@@ -188,14 +283,34 @@ class TestJSAbstractions < Test::Unit::TestCase
   def test_salsify_ai_mistral_provider
     js_code = <<~JS
       var provider = SalsifyAI.mistralProvider("mistralkey", "https://api.mistral.ai");
-      var response = provider.callCompletion("Mistral test", {simulate: true, response_format: {dummy: true}});
+      var response = provider.callCompletion("Mistral test", {debugPrompt: true, response_format: {dummy: true}});
       response;
     JS
     result = @ctx.eval(js_code)
+
+    messages = result["payload"]["messages"]
+    expected_messages = [
+      {
+        "role": "system",
+        "content": "~~~~BEGIN RESPOND WITH THIS SCHEMA~~~~\n"\
+                   "{\"dummy\":true}\n"\
+                   "~~~~END RESPOND WITH THIS SCHEMA~~~~\n"\
+                   "~~~~BEGIN RESPONSE DIRECTIVE~~~~\n"\
+                   "Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\n"\
+                   "~~~~END RESPONSE DIRECTIVE~~~~"
+      },
+      {
+        "role": "user",
+        "content": "Mistral test"
+      }
+    ]
+    assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
+
     expected_url = "https://api.mistral.ai/v1/chat/completions"
     assert_equal(expected_url, result["url"], "Mistral URL mismatch")
     assert_equal("Bearer mistralkey", result["headers"]["Authorization"], "Mistral Authorization header mismatch")
     assert_equal("application/json", result["headers"]["Accept"], "Mistral Accept header mismatch")
+
     # For Mistral, any provided response_format is converted to a fixed { type: 'json_object' }.
     assert_equal({ "type" => "json_object" }, result["payload"]["response_format"], "Mistral response_format conversion failed")
   end
@@ -213,14 +328,32 @@ class TestJSAbstractions < Test::Unit::TestCase
     }
     js_code = <<~JS
       var provider = SalsifyAI.geminiViaOpenAIProvider("geminiOpenAIKey", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
-      var response = provider.callCompletion("GeminiViaOpenAI test", {simulate: true, max_tokens: 250, response_format: #{response_format.to_json}});
+      provider.addContext("SUper Context", "Duper Context");
+      var response = provider.callCompletion("GeminiViaOpenAI test", {debugPrompt: true, max_tokens: 250, response_format: #{response_format.to_json}});
       response;
     JS
     result = @ctx.eval(js_code)
+
+    messages = result["payload"]["messages"]
+    expected_messages = [
+      {
+        "role": "system",
+        "content": "~~~~BEGIN SUper Context~~~~\n"\
+        "Duper Context\n"\
+        "~~~~END SUper Context~~~~"
+      },
+      {
+        "role": "user",
+        "content": "GeminiViaOpenAI test"
+      }
+    ]
+    assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
+
     expected_url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
     assert_equal(expected_url, result["url"], "GeminiViaOpenAI URL mismatch")
     assert_equal("Bearer geminiOpenAIKey", result["headers"]["Authorization"], "GeminiViaOpenAI Authorization header mismatch")
     assert_equal(250, result["payload"]["max_tokens"], "GeminiViaOpenAI max_tokens mismatch")
+
     # The response_format should be embedded as { json_schema: <provided schema>, type: 'json_schema' }.
     expected_response_format = { "json_schema" => deep_stringify_keys(response_format), "type" => "json_schema" }
     assert_equal(expected_response_format, result["payload"]["response_format"], "GeminiViaOpenAI response_format mismatch")
@@ -232,15 +365,30 @@ class TestJSAbstractions < Test::Unit::TestCase
       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
       provider.addContext("Greeting", {msg: "Hello"});
       provider.addContext("Footer", "Goodbye");
-      var response = provider.callCompletion("Base prompt", {simulate: true});
+      var response = provider.callCompletion("Base prompt", {debugPrompt: true});
       response;
     JS
     result = @ctx.eval(js_code)
     # The full prompt (passed as message content) should include the contexts.
-    prompt = result["payload"]["messages"][0]["content"]
-    assert_match(/~~~~BEGIN Greeting~~~~/, prompt, "Context 'Greeting' missing from prompt")
-    assert_match(/~~~~BEGIN Footer~~~~/, prompt, "Context 'Footer' missing from prompt")
-    assert_match(/Base prompt/, prompt, "Base prompt missing")
+    messages = result["payload"]["messages"]
+    expected_messages = [
+      {
+        "role": "system",
+        "content": "~~~~BEGIN Greeting~~~~\n"\
+                   "{\n"\
+                   "  \"msg\": \"Hello\"\n"\
+                   "}\n"\
+                   "~~~~END Greeting~~~~\n"\
+                   "~~~~BEGIN Footer~~~~\n"\
+                   "Goodbye\n"\
+                   "~~~~END Footer~~~~"
+      },
+      {
+        "role": "user",
+        "content": "Base prompt"
+      }
+    ]
+    assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
   end
 
   # --- Optional: Credentials Injection Test ---
@@ -249,7 +397,7 @@ class TestJSAbstractions < Test::Unit::TestCase
       credentials = File.read("credentials.txt").strip
       js_code = <<~JS
         var provider = SalsifyAI.openAIProvider("#{credentials}", "https://api.openai.com/v1");
-        var response = provider.callCompletion("Credential test", {simulate: true});
+        var response = provider.callCompletion("Credential test", {debugPrompt: true});
         response;
       JS
       result = @ctx.eval(js_code)
