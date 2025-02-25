@@ -17,7 +17,16 @@ The SalsifyAI library provides a unified, chainable interface for interacting wi
 
 ## Installation
 
-Include the `wrapper.js` file in your project. This library is written in pure ES5 and assumes that a synchronous function `web_request(url, method, payload, headers)` is available in your runtime environment.
+Use a [js helper](https://developers.salsify.com/docs/workflow-templating#custom-helpers) to associate the library with your desired workflow.
+ ```json
+ "__js_helpers__": [
+    {
+      "url": "https://raw.githubusercontent.com/rlburkes/salsify_orchestration/refs/heads/main/ai_helpers/wrapper.js",
+      "type": "remote",
+      "binding": "SalsifyAI"
+    }
+  ]
+ ```
 
 ## Creating a Provider Instance
 
@@ -207,7 +216,7 @@ var response = openAIProvider.callCompletion('Generate a creative tagline for th
 ```javascript
 var mistralProvider = SalsifyAI.mistralProvider('your-mistral-api-key');
 var multiModalResponse = mistralProvider.callImageAnalysis(
-  [ 'https://example.com/image.jpg' ],
+  [ 'https://images.salsify.com/image/upload/s--VEs3SZqz--/t_salsify_thumb/2d0e8e5aa13922cd110c79fb248237133ea49961.jpg' ],
   'Describe the scene in the image and provide creative feedback.',
   {
     max_tokens: 1500,
@@ -227,6 +236,7 @@ var multiModalResponse = mistralProvider.callImageAnalysis(
   }
 );
 ```
+![Sample Photo](https://images.salsify.com/image/upload/s--VEs3SZqz--/t_salsify_thumb/2d0e8e5aa13922cd110c79fb248237133ea49961.jpg)
 =>
 ```json
 {
