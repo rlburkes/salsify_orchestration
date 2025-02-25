@@ -244,3 +244,89 @@ var multiModalResponse = mistralProvider.callImageAnalysis(
   "description":"The image depicts the iconic Golden Gate Bridge shrouded in a thick layer of fog. The bridge's towering structure and suspension cables are partially obscured by the mist, creating a mysterious and ethereal atmosphere. The water below is calm, reflecting the muted colors of the sky and the bridge."
 }
 ```
+### Example: Text Completion with Gemini
+```javascript
+var geminiProvider = SalsifyAI.geminiProvider(secret_value('gemini'));
+geminiProvider.addContext('Product Data', context.entity);
+
+var geminiResponse = geminiProvider.callCompletion('Analyze the product data and summarize key insights.', {
+  responseFormat: {
+    name: "geminiResponse",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        summary: { type: "string" },
+        details: { type: "string" }
+      },
+      required: ["summary", "details"],
+      additionalProperties: false
+    }
+  }
+});
+```
+=>
+```json
+{
+  "details": "The product data provides a comprehensive description of a 55-inch Ultra HD television manufactured by VisionTech.  Key features include vibrant colors, deep blacks, and smart TV functionality.  Dimensions are 48 x 28 x 3 inches, and it weighs 15 lbs. The product is categorized as \"Electronics\", has a SKU of \"TV-001\", a price of $599.99, and 25 units are currently in stock.  The release date was July 15, 2023.  An image URL is also included in the data.",
+  "summary": "55\" Ultra HD Smart TV from VisionTech.  $599.99, 25 in stock."
+}
+```
+### Example: Text Completion with Anthropic (Claude)
+```javascript
+var anthropicProvider = SalsifyAI.anthropicProvider(secret_value('anthropic-claude'));
+
+anthropicProvider.addContext('Target Language', { language: 'French' });
+anthropicProvider.addContext('Product Data', Product.propertyValues({ "dataType": "string" }));
+
+var anthropicResponse = anthropicProvider.callCompletion('Translate the attached "Product Data" into the "Target Language"');
+anthropicResponse
+```
+=>
+```
+Here's the product data translated to French:
+
+[
+  "VisionTech",
+  "Un téléviseur intelligent Ultra HD de 55 pouces avec des couleurs vibrantes et des noirs profonds.",
+  "122 x 71 x 7,6 centimètres",
+  "Téléviseur Ultra HD 55\"",
+  "1",
+  "TV-001",
+  "6,8 kg"
+]
+
+Note: I've converted the measurements to metric units as commonly used in French-speaking countries:
+- 48 x 28 x 3 inches → 122 x 71 x 7,6 centimètres
+- 15 lbs → 6,8 kg
+```
+### Example: Text Completion with GeminiViaOpenAI
+
+GeminiViaOpenAI provides an interface to the Gemini model using a request format similar to OpenAI’s chat completions. This allows clients accustomed to OpenAI’s payload structure to leverage Gemini’s capabilities with minimal changes.
+```javascript
+var geminiViaOpenAIProvider = SalsifyAI.geminiViaOpenAIProvider(secret_value('gemini'));
+geminiViaOpenAIProvider.addContext('User Preferences', { tone: 'friendly', style: 'conversational' });
+
+var geminiViaOpenAIResponse = geminiViaOpenAIProvider.callCompletion('Generate a response that adheres to the user preferences provided.', {
+  model: 'gemini-2.0-flash',
+  responseFormat: {
+    name: "geminiViaOpenAIResponse",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        response: { type: "string" }
+      },
+      required: ["response"],
+      additionalProperties: false
+    }
+  }
+});
+geminiViaOpenAIResponse
+```
+
+```json
+{
+  "response":"Hey there! How can I help you today? I'm happy to assist in any way I can!"
+}
+```

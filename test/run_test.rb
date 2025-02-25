@@ -250,7 +250,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     expected_url = "https://api.openai.com/v1/chat/completions"
     assert_equal(expected_url, result["url"], "Mistral URL mismatch")
 
-    expected_model = "4o"
+    expected_model = "gpt-4o"
     assert_equal(expected_model, result["payload"]["model"], "OpenAI Model mismatch")
   end
 
