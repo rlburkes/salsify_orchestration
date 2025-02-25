@@ -225,24 +225,24 @@ class TestJSAbstractions < Test::Unit::TestCase
     expected_messages = [
       {
         "role": "user",
-        "content": {
+        "content": [{
           "type": "image_url",
-          "image_url": "https://foobar.png"
-        }
+          "image_url": { "url": "https://foobar.png" }
+        }]
       },
       {
         "role": "user",
-        "content": {
+        "content": [{
           "type": "image_url",
-          "image_url": "https://foobaz.jpg"
-        }
+          "image_url": { "url": "https://foobaz.jpg" }
+        }]
       },
       {
         "role": "user",
-        "content": {
+        "content": [{
           "type": "text",
           "text": "Analyze these images"
-        }
+        }]
       }
     ]
     assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
@@ -404,24 +404,24 @@ class TestJSAbstractions < Test::Unit::TestCase
       },
       {
         "role": "user",
-        "content": {
+        "content": [{
           "type": "image_url",
           "image_url": "https://foobar.png"
-        }
+        }]
       },
       {
         "role": "user",
-        "content": {
+        "content": [{
           "type": "image_url",
           "image_url": "https://foobaz.jpg"
-        }
+        }]
       },
       {
         "role": "user",
-        "content": {
+        "content": [{
           "type": "text",
           "text": "Analyze these images"
-        }
+        }]
       }
     ]
     assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")

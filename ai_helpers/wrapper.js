@@ -347,10 +347,10 @@ function createSalsifyAI() {
       // Build an image message. Here we simply join the image URLs into a text string.
       var imageMessageTuples = imageUrls.map(imageUrl => {
         var img = (providerName === "OpenAI") ? { "url": imageUrl } : imageUrl;
-        return ["user", { "type": "image_url", "image_url": imageUrl }];
+        return ["user", [{ "type": "image_url", "image_url": img }]];
       });
 
-      imageMessageTuples.push(["user", { "type": "text", "text": prompt }]);
+      imageMessageTuples.push(["user", [{ "type": "text", "text": prompt }]]);
 
       return callCompletion(imageMessageTuples, params);
     }
