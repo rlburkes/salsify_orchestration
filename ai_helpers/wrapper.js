@@ -261,6 +261,22 @@ function createSalsifyAI() {
       }
     }
 
+    function serializeContext(messages) {
+
+      if (contexts.length < 1) {
+        return contexts;
+      }
+
+      switch (providerName) {
+        case "Anthropic":
+          return messages.unshift({ role: "user", content: contexts.join("\n") });
+        case "Gemini":
+          return messages.unshift({ role: "user", parts: [ { text: contexts.join("\n") } ] });
+        default:
+          return messages.unshift({ role: "system", content: contexts.join("\n") });
+      }
+    }
+
     function extractJSON(content, coerceJSON) {
       if (coerceJSON) {
         try {
@@ -280,7 +296,7 @@ function createSalsifyAI() {
       params = params || {};
 
       var messages = buildMessages(providerName, prompt);
-
+      // Ensure that the response format is valid if present, and if the provider doesn't support JSON append the format to the context as a directive to the LLM.
       if (params.response_format) {
         if (providerSupportsJSON) {
           var errors = validateResponseFormat(params.response_format);
@@ -293,14 +309,7 @@ function createSalsifyAI() {
         }
       }
 
-      if (contexts.length > 0) {
-        if (providerName === "Gemini") {
-          messages.unshift({ role: "user", parts: [ { text: contexts.join("\n") } ] });
-        } else {
-          messages.unshift({ role: "system", content: contexts.join("\n") });
-        }
-      }
-
+      serializeContext(messages);
       var requestObject = buildRequest(providerName, apiKey, baseUrl, messages, params);
 
       var response = requestObject; // default to the request so we can debug

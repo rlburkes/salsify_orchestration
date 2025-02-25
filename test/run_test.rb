@@ -216,15 +216,31 @@ class TestJSAbstractions < Test::Unit::TestCase
   def test_salsify_ai_anthropic_provider
     js_code = <<~JS
       var provider = SalsifyAI.anthropicProvider("anthrokey", "https://api.anthropic.com");
-      var response = provider.callCompletion("Anthropic test", {debugPrompt: true});
+      var response = provider.callCompletion("Anthropic test", {debugPrompt: true, response_format: { "foo": "bar" }});
       response;
     JS
     result = @ctx.eval(js_code)
     assert_equal("https://api.anthropic.com/v1/messages", result["url"], "Anthropic URL mismatch")
     assert_equal("anthrokey", result["headers"]["x-api-key"], "API key header mismatch")
     assert_equal("2023-06-01", result["headers"]["anthropic-version"], "Anthropic version header mismatch")
+
     messages = result["payload"]["messages"]
-    assert_equal("Anthropic test", messages[0]["content"], "Anthropic prompt message mismatch")
+    expected_messages = [
+      {
+        "role": "user",
+        "content": "~~~~BEGIN RESPOND WITH THIS SCHEMA~~~~\n"\
+                   "{\"foo\":\"bar\"}\n"\
+                   "~~~~END RESPOND WITH THIS SCHEMA~~~~\n"\
+                   "~~~~BEGIN RESPONSE DIRECTIVE~~~~\n"\
+                   "Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\n"\
+                   "~~~~END RESPONSE DIRECTIVE~~~~"
+      },
+      {
+        "role": "user",
+        "content": "Anthropic test"
+      }
+    ]
+    assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
   end
 
   def test_salsify_ai_gemini_provider
@@ -408,5 +424,3 @@ class TestJSAbstractions < Test::Unit::TestCase
     end
   end
 end
-
-puts "All tests passed."
