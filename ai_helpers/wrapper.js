@@ -343,7 +343,7 @@ function createSalsifyAI() {
 
       params = params || {};
 
-      params["model"] = params["model"] || ((providerName === "OpenAI")? "4o" : "pixtral-12b-2409")
+      params["model"] = params["model"] || ((providerName === "OpenAI")? "gpt-4o" : "pixtral-12b-2409")
       // Build an image message. Here we simply join the image URLs into a text string.
       var imageMessageTuples = imageUrls.map(imageUrl => {
         var img = (providerName === "OpenAI") ? { "url": imageUrl } : imageUrl;
