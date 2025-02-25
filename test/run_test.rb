@@ -114,7 +114,7 @@ class TestJSAbstractions < Test::Unit::TestCase
 
   def test_salsify_ai_openai_provider
     js_code = <<~JS
-      var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
+      var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
       var response = provider.callCompletion("Test prompt", { debugPrompt: true, max_tokens: 150 });
       response;
     JS
@@ -130,7 +130,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     # Test that using a string prompt with debugPrompt returns a correct request object.
    def test_openai_debug_prompt_with_string
      js_code = <<~JS
-       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
+       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
        var response = provider.callCompletion("Simple prompt", { debugPrompt: true, max_tokens: 150 });
        response;
      JS
@@ -148,7 +148,7 @@ class TestJSAbstractions < Test::Unit::TestCase
    # Test that using an array of message tuples returns the expected messages array.
    def test_openai_debug_prompt_with_array
      js_code = <<~JS
-       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
+       var provider = SalsifyAI.openAIProvider("testkey");
        var response = provider.callCompletion([["assistant", "Hello"], ["user", "How are you?"]], { debugPrompt: true, max_tokens: 200 });
        response;
      JS
@@ -164,7 +164,7 @@ class TestJSAbstractions < Test::Unit::TestCase
    # Test that adding context prepends a system message to the messages array.
    def test_openai_with_context
      js_code = <<~JS
-       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
+       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
        provider.addContext("Greeting", { msg: "Hello World" });
        var response = provider.callCompletion("Prompt with context", { debugPrompt: true });
        response;
@@ -178,7 +178,7 @@ class TestJSAbstractions < Test::Unit::TestCase
    # Test that debugResponse returns the raw API response (without content extraction).
    def test_openai_debug_response
      js_code = <<~JS
-       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
+       var provider = SalsifyAI.openAIProvider("testkey");
        var response = provider.callCompletion("Test prompt", { debugResponse: true, max_tokens: 150 });
        response;
      JS
@@ -187,36 +187,88 @@ class TestJSAbstractions < Test::Unit::TestCase
      assert(result.has_key?("choices"), "Raw response should contain 'choices'")
    end
 
-   # Test that an invalid response_format returns an error array.
+   # Test that an invalid responseFormat returns an error array.
    def test_openai_invalid_response_format
      js_code = <<~JS
-       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
-       var response = provider.callCompletion("Test prompt", { debugPrompt: true, response_format: {} });
+       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
+       var response = provider.callCompletion("Test prompt", { debugPrompt: true, responseFormat: {} });
        response;
      JS
      result = @ctx.eval(js_code)
-     assert(result.is_a?(Array), "Expected an error array for invalid response_format")
+     assert(result.is_a?(Array), "Expected an error array for invalid responseFormat")
      assert(result.include?("Missing 'name' property."), "Expected error about missing 'name' property")
    end
 
   def test_openai_response_format_validation
-    # For providers supporting JSON (OpenAI and GeminiViaOpenAI), invalid response_format should return errors.
+    # For providers supporting JSON (OpenAI and GeminiViaOpenAI), invalid responseFormat should return errors.
     js_code = <<~JS
-      var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
-      // Supply an invalid response_format (missing required properties).
-      var result = provider.callCompletion("Test prompt", {debugPrompt: true, response_format: {}});
+      var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
+      // Supply an invalid responseFormat (missing required properties).
+      var result = provider.callCompletion("Test prompt", {debugPrompt: true, responseFormat: {}});
       result;
     JS
     result = @ctx.eval(js_code)
     # Expect an array of error messages.
-    assert(result.is_a?(Array), "Expected error array for invalid response_format")
+    assert(result.is_a?(Array), "Expected error array for invalid responseFormat")
     assert(result.include?("Missing 'name' property."), "Expected missing 'name' error")
+  end
+
+  def test_salsify_ai_openai_provider_image_analysis
+    js_code = <<~JS
+      var provider = SalsifyAI.openAIProvider("fake-key");
+      var response = provider.callImageAnalysis(["https://foobar.png", "https://foobaz.jpg"], "Analyze these images", { debugPrompt: true });
+      response;
+    JS
+    result = @ctx.eval(js_code)
+
+    messages = result["payload"]["messages"]
+    expected_messages = [
+      {
+        "role": "user",
+        "content": {
+          "type": "image_url",
+          "image_url": "https://foobar.png"
+        }
+      },
+      {
+        "role": "user",
+        "content": {
+          "type": "image_url",
+          "image_url": "https://foobaz.jpg"
+        }
+      },
+      {
+        "role": "user",
+        "content": {
+          "type": "text",
+          "text": "Analyze these images"
+        }
+      }
+    ]
+    assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
+
+    expected_url = "https://api.openai.com/v1/chat/completions"
+    assert_equal(expected_url, result["url"], "Mistral URL mismatch")
+
+    expected_model = "4o"
+    assert_equal(expected_model, result["payload"]["model"], "OpenAI Model mismatch")
+  end
+
+  def test_salsify_ai_openai_provider_image_analysis_model_override
+    js_code = <<~JS
+      var provider = SalsifyAI.openAIProvider("fake-key");
+      var response = provider.callImageAnalysis(["https://foobar.png", "https://foobaz.jpg"], "Analyze these images", { debugPrompt: true, model: "4o-mini" });
+      response;
+    JS
+    result = @ctx.eval(js_code)
+    expected_model = "4o-mini"
+    assert_equal(expected_model, result["payload"]["model"], "OpenAI Model mismatch")
   end
 
   def test_salsify_ai_anthropic_provider
     js_code = <<~JS
       var provider = SalsifyAI.anthropicProvider("anthrokey", "https://api.anthropic.com");
-      var response = provider.callCompletion("Anthropic test", {debugPrompt: true, response_format: { "foo": "bar" }});
+      var response = provider.callCompletion("Anthropic test", {debugPrompt: true, responseFormat: { "foo": "bar" }});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -244,9 +296,9 @@ class TestJSAbstractions < Test::Unit::TestCase
   end
 
   def test_salsify_ai_gemini_provider
-    # For Gemini, note that providerSupportsJSON is false, so the response_format is injected as a directive and
+    # For Gemini, note that providerSupportsJSON is false, so the responseFormat is injected as a directive and
     # later used to set generationConfig.responseSchema.
-    response_format = {
+    responseFormat = {
       "name": "TestSchema",
       "strict": false,
       "schema": {
@@ -258,7 +310,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     }
     js_code = <<~JS
       var provider = SalsifyAI.geminiProvider("geminikey", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
-      var response = provider.callCompletion("Gemini test", {debugPrompt: true, max_tokens: 200, response_format: #{response_format.to_json}});
+      var response = provider.callCompletion("Gemini test", {debugPrompt: true, max_tokens: 200, responseFormat: #{responseFormat.to_json}});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -299,7 +351,7 @@ class TestJSAbstractions < Test::Unit::TestCase
   def test_salsify_ai_mistral_provider
     js_code = <<~JS
       var provider = SalsifyAI.mistralProvider("mistralkey", "https://api.mistral.ai");
-      var response = provider.callCompletion("Mistral test", {debugPrompt: true, response_format: {dummy: true}});
+      var response = provider.callCompletion("Mistral test", {debugPrompt: true, responseFormat: {dummy: true}});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -327,12 +379,68 @@ class TestJSAbstractions < Test::Unit::TestCase
     assert_equal("Bearer mistralkey", result["headers"]["Authorization"], "Mistral Authorization header mismatch")
     assert_equal("application/json", result["headers"]["Accept"], "Mistral Accept header mismatch")
 
-    # For Mistral, any provided response_format is converted to a fixed { type: 'json_object' }.
-    assert_equal({ "type" => "json_object" }, result["payload"]["response_format"], "Mistral response_format conversion failed")
+    # For Mistral, any provided responseFormat is converted to a fixed { type: 'json_object' }.
+    assert_equal({ "type" => "json_object" }, result["payload"]["response_format"], "Mistral responseFormat conversion failed")
+  end
+
+  def test_salsify_ai_mistral_provider_image_analysis
+    js_code = <<~JS
+      var provider = SalsifyAI.mistralProvider("mistralkey", "https://api.mistral.ai");
+      var response = provider.callImageAnalysis(["https://foobar.png", "https://foobaz.jpg"], "Analyze these images", {debugPrompt: true, responseFormat: {dummy: true}});
+      response;
+    JS
+    result = @ctx.eval(js_code)
+
+    messages = result["payload"]["messages"]
+    expected_messages = [
+      {
+        "role": "system",
+        "content": "~~~~BEGIN RESPOND WITH THIS SCHEMA~~~~\n"\
+                   "{\"dummy\":true}\n"\
+                   "~~~~END RESPOND WITH THIS SCHEMA~~~~\n"\
+                   "~~~~BEGIN RESPONSE DIRECTIVE~~~~\n"\
+                   "Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\n"\
+                   "~~~~END RESPONSE DIRECTIVE~~~~"
+      },
+      {
+        "role": "user",
+        "content": {
+          "type": "image_url",
+          "image_url": "https://foobar.png"
+        }
+      },
+      {
+        "role": "user",
+        "content": {
+          "type": "image_url",
+          "image_url": "https://foobaz.jpg"
+        }
+      },
+      {
+        "role": "user",
+        "content": {
+          "type": "text",
+          "text": "Analyze these images"
+        }
+      }
+    ]
+    assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
+
+    expected_url = "https://api.mistral.ai/v1/chat/completions"
+    assert_equal(expected_url, result["url"], "Mistral URL mismatch")
+
+    assert_equal("Bearer mistralkey", result["headers"]["Authorization"], "Mistral Authorization header mismatch")
+    assert_equal("application/json", result["headers"]["Accept"], "Mistral Accept header mismatch")
+
+    expected_model = "pixtral-12b-2409"
+    assert_equal(expected_model, result["payload"]["model"], "Mistral Model mismatch")
+
+    # For Mistral, any provided responseFormat is converted to a fixed { type: 'json_object' }.
+    assert_equal({ "type" => "json_object" }, result["payload"]["response_format"], "Mistral responseFormat conversion failed")
   end
 
   def test_salsify_ai_gemini_via_openai_provider
-    response_format = {
+    responseFormat = {
       "name": "ValidSchema",
       "strict": true,
       "schema": {
@@ -345,7 +453,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     js_code = <<~JS
       var provider = SalsifyAI.geminiViaOpenAIProvider("geminiOpenAIKey", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
       provider.addContext("SUper Context", "Duper Context");
-      var response = provider.callCompletion("GeminiViaOpenAI test", {debugPrompt: true, max_tokens: 250, response_format: #{response_format.to_json}});
+      var response = provider.callCompletion("GeminiViaOpenAI test", {debugPrompt: true, max_tokens: 250, responseFormat: #{responseFormat.to_json}});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -370,9 +478,9 @@ class TestJSAbstractions < Test::Unit::TestCase
     assert_equal("Bearer geminiOpenAIKey", result["headers"]["Authorization"], "GeminiViaOpenAI Authorization header mismatch")
     assert_equal(250, result["payload"]["max_tokens"], "GeminiViaOpenAI max_tokens mismatch")
 
-    # The response_format should be embedded as { json_schema: <provided schema>, type: 'json_schema' }.
-    expected_response_format = { "json_schema" => deep_stringify_keys(response_format), "type" => "json_schema" }
-    assert_equal(expected_response_format, result["payload"]["response_format"], "GeminiViaOpenAI response_format mismatch")
+    # The responseFormat should be embedded as { json_schema: <provided schema>, type: 'json_schema' }.
+    expected_responseFormat = { "json_schema" => deep_stringify_keys(responseFormat), "type" => "json_schema" }
+    assert_equal(expected_responseFormat, result["payload"]["response_format"], "GeminiViaOpenAI responseFormat mismatch")
   end
 
   def test_add_context_chainability

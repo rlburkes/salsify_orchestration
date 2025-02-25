@@ -2,7 +2,7 @@
  * This module returns an object "SalsifyAI" that exposes provider-specific builder methods.
  * Each provider object includes chainable methods for configuration (setApiKey, setBaseUrl),
  * an addContext method to attach structured data to every prompt, and a callCompletion method
- * that supports simulation mode (via debugPrompt), a debugResponse flag, and a response_format option.
+ * that supports simulation mode (via debugPrompt), a debugResponse flag, and a responseFormat option.
  *
  * This version is written in pure ES5 (synchronous, no Promises) and assumes a synchronous
  * web_request(url, method, payload, headers) function is available.
@@ -115,7 +115,7 @@ function createSalsifyAI() {
         } else if (typeof item === "object" && item.hasOwnProperty("role") && item.hasOwnProperty("content")) {
           return item;
         } else {
-          throw new Error("Invalid message format: each message must be a [role, content] tuple or an object with role and content.");
+          throw new Error(`Invalid message format: each message must be a [role, content] tuple or an object with role and content. Got ${item}`);
         }
       });
     } else {
@@ -142,16 +142,16 @@ function createSalsifyAI() {
 
     switch (providerName) {
       case "OpenAI":
-        request.url = finalApiUrl(baseUrl, "/chat/completions");
+        request.url = finalApiUrl(baseUrl, "/v1/chat/completions");
         request.headers.Authorization = "Bearer " + apiKey;
         request.payload = {
           model: params.model || "gpt-4o",
           messages: messages,
           max_tokens: params.max_tokens || 1000
         };
-        if (params.response_format) {
+        if (params.responseFormat) {
           request.payload.response_format = {
-            json_schema: params.response_format,
+            json_schema: params.responseFormat,
             type: 'json_schema'
           };
         }
@@ -177,10 +177,10 @@ function createSalsifyAI() {
           request.payload.generationConfig = request.payload.generationConfig || {};
           request.payload.generationConfig.maxOutputTokens = params.max_tokens;
         }
-        if (params.response_format) {
+        if (params.responseFormat) {
           request.payload.generationConfig = request.payload.generationConfig || {};
           request.payload.generationConfig.responseMimeType = "application/json";
-          request.payload.generationConfig.responseSchema = convertResponseFormatForGemini(params.response_format);
+          request.payload.generationConfig.responseSchema = convertResponseFormatForGemini(params.responseFormat);
         }
         break;
 
@@ -192,7 +192,7 @@ function createSalsifyAI() {
           model: params.model || "mistral-large-latest",
           messages: messages
         };
-        if (params.response_format) {
+        if (params.responseFormat) {
           request.payload.response_format = { type: "json_object" };
         }
         break;
@@ -205,9 +205,9 @@ function createSalsifyAI() {
           messages: messages,
           max_tokens: params.max_tokens || 1000
         };
-        if (params.response_format) {
+        if (params.responseFormat) {
           request.payload.response_format = {
-            json_schema: params.response_format,
+            json_schema: params.responseFormat,
             type: 'json_schema'
           };
         }
@@ -295,21 +295,26 @@ function createSalsifyAI() {
       }
       params = params || {};
 
+      // if (Array.isArray(prompt)) {
+      //   throw new Error(`These Prompts be whilllin Got ${prompt.length}, ${prompt}`);
+      // }
       var messages = buildMessages(providerName, prompt);
       // Ensure that the response format is valid if present, and if the provider doesn't support JSON append the format to the context as a directive to the LLM.
-      if (params.response_format) {
+      if (params.responseFormat) {
         if (providerSupportsJSON) {
-          var errors = validateResponseFormat(params.response_format);
+          var errors = validateResponseFormat(params.responseFormat);
           if (errors.length > 0) {
             return errors;
           }
         } else {
-          addContext("RESPOND WITH THIS SCHEMA", JSON.stringify(params.response_format));
+          addContext("RESPOND WITH THIS SCHEMA", JSON.stringify(params.responseFormat));
           addContext("RESPONSE DIRECTIVE", "Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary");
         }
       }
 
+      // Serialize any added CONTEXTS to the request;
       serializeContext(messages);
+
       var requestObject = buildRequest(providerName, apiKey, baseUrl, messages, params);
 
       var response = requestObject; // default to the request so we can debug
@@ -320,17 +325,42 @@ function createSalsifyAI() {
       if (requestObject.debugResponse || requestObject.debugPrompt) {
         return response;
       } else {
-        response = extractJSON(extractContent(response), params.response_format || false);
+        response = extractJSON(extractContent(response), params.responseFormat || false);
       }
 
       return response;
+    }
+
+    // New method to support multi-modal image analysis.
+    function callImageAnalysis(imageUrls, prompt, params) {
+      if (!Array.isArray(imageUrls)) {
+        throw new Error("Image URLs must be provided as an array.");
+      }
+
+      if (providerName != "Mistral" && providerName != "OpenAI") {
+        throw new Error(`Image analysis is not currently supported for ${providerName}.`)
+      }
+
+      params = params || {};
+
+      params["model"] = params["model"] || ((providerName === "OpenAI")? "4o" : "pixtral-12b-2409")
+      // Build an image message. Here we simply join the image URLs into a text string.
+      var imageMessageTuples = imageUrls.map(imageUrl => {
+        var img = (providerName === "OpenAI") ? { "url": imageUrl } : imageUrl;
+        return ["user", { "type": "image_url", "image_url": imageUrl }];
+      });
+
+      imageMessageTuples.push(["user", { "type": "text", "text": prompt }]);
+
+      return callCompletion(imageMessageTuples, params);
     }
 
     var providerObj = {
       setApiKey: setApiKey,
       setBaseUrl: setBaseUrl,
       addContext: addContext,
-      callCompletion: callCompletion
+      callCompletion: callCompletion,
+      callImageAnalysis: callImageAnalysis
     };
 
     return providerObj;
@@ -338,7 +368,7 @@ function createSalsifyAI() {
 
   return {
     openAIProvider: function(apiKey, baseUrl) {
-      return createProvider("OpenAI", apiKey, baseUrl || "https://api.openai.com/v1");
+      return createProvider("OpenAI", apiKey, baseUrl || "https://api.openai.com");
     },
     anthropicProvider: function(apiKey, baseUrl) {
       return createProvider("Anthropic", apiKey, baseUrl || "https://api.anthropic.com");
