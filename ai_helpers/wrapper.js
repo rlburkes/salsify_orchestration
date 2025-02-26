@@ -278,7 +278,7 @@ function createSalsifyAI() {
         case "Gemini":
           return messages.unshift({ role: "user", parts: [ { text: contexts.join("\n") } ] });
         default:
-          return messages.unshift({ role: "user", content: contextObject });
+          return messages.unshift({ role: "user", content: JSON.stringify(contextObject) });
       }
     }
 
