@@ -51,8 +51,8 @@ Each provider instance exposes chainable methods to configure your API key and b
 
 ```javascript
 openAIProvider
-  .setApiKey('your-openai-api-key')
-  .setBaseUrl('https://api.openai.com');
+  .configureAPIKey('your-openai-api-key')
+  .configureEndpoint('https://api.openai.com');
 ```
 
 ## Adding Context
@@ -72,10 +72,10 @@ The library merges this context into your first message (or system message, depe
 
 ### Text Completion
 
-Use the `callCompletion` method to send a text prompt to the AI provider. You can pass additional parameters such as model selection, maximum token count, and a desired response format.
+Use the `generateText` method to send a text prompt to the AI provider. You can pass additional parameters such as model selection, maximum token count, and a desired response format.
 
 ```javascript
-var response = openAIProvider.callCompletion('Tell me a joke about our product.', {
+var response = openAIProvider.generateText('Tell me a joke about our product.', {
   model: 'gpt-4o',
   max_tokens: 150,
   responseFormat: {
@@ -103,10 +103,10 @@ var response = openAIProvider.callCompletion('Tell me a joke about our product.'
 
 ### Image Analysis (Multi-modal)
 
-For providers that support image input (currently OpenAI and Mistral), use the `callImageAnalysis` method. This method takes an array of image URLs and a text prompt.
+For providers that support image input (currently OpenAI and Mistral), use the `analyzeImage` method. This method takes an array of image URLs and a text prompt.
 
 ```javascript
-var multiModalResponse = openAIProvider.callImageAnalysis(
+var multiModalResponse = openAIProvider.analyzeImage(
   [ "https://images.salsify.com/image/upload/s--VEs3SZqz--/t_salsify_thumb/2d0e8e5aa13922cd110c79fb248237133ea49961.jpg" ],
   'Provide an analysis of the images along with a creative caption.'
 );
@@ -124,7 +124,7 @@ The image shows the iconic Golden Gate Bridge, partially covered by mist, spanni
 "Bridging the Mist: Where Horizons Meet Dreams"
 ```
 
-For providers that do not support multi-modal analysis (e.g., Anthropic, Gemini, GeminiViaOpenAI), calling `callImageAnalysis` will throw an error.
+For providers that do not support multi-modal analysis (e.g., Anthropic, Gemini, GeminiViaOpenAI), calling `analyzeImage` will throw an error.
 
 ## Debugging Options
 
@@ -132,17 +132,17 @@ The library offers two debugging flags to help inspect and troubleshoot requests
 - `debugPrompt`: When set to `true`, the method returns the constructed request object without making an actual API call.
 - `debugResponse`: When set to `true`, the method returns the raw API response (as returned by `web_request`), bypassing any JSON extraction.
 
-These flags can be used with both `callCompletion` and `callImageAnalysis`:
+These flags can be used with both `generateText` and `analyzeImage`:
 
 ```javascript
 // To inspect the request payload:
-var debugRequest = openAIProvider.callCompletion('Sample prompt', {
+var debugRequest = openAIProvider.generateText('Sample prompt', {
   debugPrompt: true,
   max_tokens: 100
 });
 
 // To inspect the raw response:
-var debugRawResponse = openAIProvider.callCompletion('Sample prompt', {
+var debugRawResponse = openAIProvider.generateText('Sample prompt', {
   debugResponse: true,
   max_tokens: 100
 });
@@ -171,13 +171,13 @@ For providers that support JSON output (such as OpenAI and GeminiViaOpenAI), the
 
 ## Providers Supported
 
-- **OpenAI**: Fully supported, including multi-modal requests via `callImageAnalysis`.
-- **Anthropic**: Supports text completions via `callCompletion`.
+- **OpenAI**: Fully supported, including multi-modal requests via `analyzeImage`.
+- **Anthropic**: Supports text completions via `generateText`.
 - **Gemini**: Supports text completions.
 - **Mistral**: Supports text completions and multi-modal image analysis.
 - **Gemini via OpenAI**: Supports text completions.
 
-> **Note**: Multi-modal image analysis is currently implemented only for OpenAI and Mistral. Attempts to use `callImageAnalysis` with other providers will result in an error.
+> **Note**: Multi-modal image analysis is currently implemented only for OpenAI and Mistral. Attempts to use `analyzeImage` with other providers will result in an error.
 
 ## Examples
 
@@ -187,7 +187,7 @@ For providers that support JSON output (such as OpenAI and GeminiViaOpenAI), the
 var openAIProvider = SalsifyAI.openAIProvider('your-openai-api-key');
 openAIProvider.addContext('Product Info', { name: 'Example', description: 'This is an example product.' });
 
-var response = openAIProvider.callCompletion('Generate a creative tagline for the product.', {
+var response = openAIProvider.generateText('Generate a creative tagline for the product.', {
   model: 'gpt-4o',
   max_tokens: 1000,
   responseFormat: {
@@ -215,7 +215,7 @@ var response = openAIProvider.callCompletion('Generate a creative tagline for th
 
 ```javascript
 var mistralProvider = SalsifyAI.mistralProvider('your-mistral-api-key');
-var multiModalResponse = mistralProvider.callImageAnalysis(
+var multiModalResponse = mistralProvider.analyzeImage(
   [ 'https://images.salsify.com/image/upload/s--VEs3SZqz--/t_salsify_thumb/2d0e8e5aa13922cd110c79fb248237133ea49961.jpg' ],
   'Describe the scene in the image and provide creative feedback.',
   {
@@ -249,7 +249,7 @@ var multiModalResponse = mistralProvider.callImageAnalysis(
 var geminiProvider = SalsifyAI.geminiProvider(secret_value('gemini'));
 geminiProvider.addContext('Product Data', context.entity);
 
-var geminiResponse = geminiProvider.callCompletion('Analyze the product data and summarize key insights.', {
+var geminiResponse = geminiProvider.generateText('Analyze the product data and summarize key insights.', {
   responseFormat: {
     name: "geminiResponse",
     strict: true,
@@ -279,7 +279,7 @@ var anthropicProvider = SalsifyAI.anthropicProvider(secret_value('anthropic-clau
 anthropicProvider.addContext('Target Language', { language: 'French' });
 anthropicProvider.addContext('Product Data', Product.propertyValues({ "dataType": "string" }));
 
-var anthropicResponse = anthropicProvider.callCompletion('Translate the attached "Product Data" into the "Target Language"');
+var anthropicResponse = anthropicProvider.generateText('Translate the attached "Product Data" into the "Target Language"');
 anthropicResponse
 ```
 =>
@@ -307,7 +307,7 @@ GeminiViaOpenAI provides an interface to the Gemini model using a request format
 var geminiViaOpenAIProvider = SalsifyAI.geminiViaOpenAIProvider(secret_value('gemini'));
 geminiViaOpenAIProvider.addContext('User Preferences', { tone: 'friendly', style: 'conversational' });
 
-var geminiViaOpenAIResponse = geminiViaOpenAIProvider.callCompletion('Generate a response that adheres to the user preferences provided.', {
+var geminiViaOpenAIResponse = geminiViaOpenAIProvider.generateText('Generate a response that adheres to the user preferences provided.', {
   model: 'gemini-2.0-flash',
   responseFormat: {
     name: "geminiViaOpenAIResponse",

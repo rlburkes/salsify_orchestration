@@ -1,7 +1,7 @@
 /**
  * This module returns an object "SalsifyAI" that exposes provider-specific builder methods.
- * Each provider object includes chainable methods for configuration (setApiKey, setBaseUrl),
- * an addContext method to attach structured data to every prompt, and a callCompletion method
+ * Each provider object includes chainable methods for configuration (configureAPIKey, configureEndpoint),
+ * an addContext method to attach structured data to every prompt, and a generateText method
  * that supports simulation mode (via debugPrompt), a debugResponse flag, and a responseFormat option.
  *
  * This version is written in pure ES5 (synchronous, no Promises) and assumes a synchronous
@@ -30,6 +30,18 @@ function createSalsifyAI() {
     return base + path;
   }
 
+  function basePayload(params) {
+    return {
+      url: '',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      payload: {},
+      debugPrompt: params.debugPrompt || false,
+      debugResponse: params.debugResponse || false
+    };
+  }
   // Converts response format for Gemini provider.
   function convertResponseFormatForGemini(responseFormat) {
     if (typeof responseFormat !== "object" || responseFormat === null) {
@@ -90,161 +102,101 @@ function createSalsifyAI() {
     return errors;
   }
 
-  // Updated buildProviderMessage now includes providerName as first argument.
-  function buildProviderMessage(providerName, role, content) {
-    switch (providerName) {
-      case "Mistral":
-      case "Anthropic":
-      case "GeminiViaOpenAI":
-      case "OpenAI":
-        return [{ role: role, content: content }];
-      case "Gemini":
-        if (typeof content === "string") {
-          return [{ parts: [{ text: content }], role: "user" }];
-        } else {
-          return [{ parts: content, role: "user" }];
-        }
-      default:
-        throw new Error("Unsupported provider: " + providerName);
+  function extractJSON(content, coerceJSON) {
+    if (coerceJSON) {
+      try {
+        return JSON.parse(content);
+      } catch (e) {
+        // If parsing fails, leave content as is.
+        return content;
+      }
     }
+    return content;
   }
 
-  function buildMessages(providerName, prompt) {
-    if (typeof prompt === "string") {
-      return buildProviderMessage(providerName, "user", prompt);
-    } else if (Array.isArray(prompt)) {
-      return prompt.map(function(item) {
-        if (Array.isArray(item) && item.length === 2) {
-          // the [0] at the end of this line in unwrapping the single element array.
-          return buildProviderMessage(providerName, item[0], item[1])[0];
-        } else if (typeof item === "object" && item.hasOwnProperty("role") && item.hasOwnProperty("content")) {
-          return item;
-        } else {
-          throw new Error(`Invalid message format: each message must be a [role, content] tuple or an object with role and content. Got ${item}`);
-        }
-      });
-    } else {
-      throw new Error("Prompt must be a string or an array of messages or role/content tuples.");
-    }
-  }
-
-  function basePayload(params) {
-    return {
-      url: '',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      payload: {},
-      debugPrompt: params.debugPrompt || false,
-      debugResponse: params.debugResponse || false
+  function guessMimeType(url) {
+    const extensionToMime = {
+      "png": "image/png",
+      "jpg": "image/jpeg",
+      "jpeg": "image/jpeg",
+      "webp": "image/webp",
+      "heic": "image/heic",
+      "heif": "image/heif"
     };
-  }
 
-  // Build a request object based on provider specifics.
-  function buildRequest(providerName, apiKey, baseUrl, messages, params) {
-    var request = basePayload(params);
+    // Extract file extension from the URL
+    const match = url.match(/\.([a-z0-9]+)(?:[\?#]|$)/i);
+    const ext = match ? match[1].toLowerCase() : null;
 
-    switch (providerName) {
-      case "OpenAI":
-        request.url = finalApiUrl(baseUrl, "/v1/chat/completions");
-        request.headers.Authorization = "Bearer " + apiKey;
-        request.payload = {
-          model: params.model || "gpt-4o",
-          messages: messages,
-          max_tokens: params.max_tokens || 1000
-        };
-        if (params.responseFormat) {
-          request.payload.response_format = {
-            json_schema: params.responseFormat,
-            type: 'json_schema'
-          };
-        }
-        break;
-
-      case "Anthropic":
-        request.url = finalApiUrl(baseUrl, "/v1/messages");
-        request.headers["x-api-key"] = apiKey;
-        request.headers["anthropic-version"] = "2023-06-01";
-        request.payload = {
-          model: params.model || "claude-3-5-sonnet-20241022",
-          max_tokens: params.max_tokens || 1024,
-          messages: messages
-        };
-        break;
-
-      case "Gemini":
-        request.url = finalApiUrl(baseUrl, "") + "?key=" + apiKey;
-        request.payload = {
-          contents: messages
-        };
-        if (params.max_tokens) {
-          request.payload.generationConfig = request.payload.generationConfig || {};
-          request.payload.generationConfig.maxOutputTokens = params.max_tokens;
-        }
-        if (params.responseFormat) {
-          request.payload.generationConfig = request.payload.generationConfig || {};
-          request.payload.generationConfig.responseMimeType = "application/json";
-          request.payload.generationConfig.responseSchema = convertResponseFormatForGemini(params.responseFormat);
-        }
-        break;
-
-      case "Mistral":
-        request.url = finalApiUrl(baseUrl, "/v1/chat/completions");
-        request.headers.Authorization = "Bearer " + apiKey;
-        request.headers.Accept = "application/json";
-        request.payload = {
-          model: params.model || "mistral-large-latest",
-          messages: messages
-        };
-        if (params.responseFormat) {
-          request.payload.response_format = { type: "json_object" };
-        }
-        break;
-
-      case "GeminiViaOpenAI":
-        request.url = finalApiUrl(baseUrl, "");
-        request.headers.Authorization = "Bearer " + apiKey;
-        request.payload = {
-          model: params.model || "gemini-2.0-flash",
-          messages: messages,
-          max_tokens: params.max_tokens || 1000
-        };
-        if (params.responseFormat) {
-          request.payload.response_format = {
-            json_schema: params.responseFormat,
-            type: 'json_schema'
-          };
-        }
-        break;
-
-      default:
-        throw new Error("Unsupported provider: " + providerName);
-    }
-
-    return request;
+    return ext ? extensionToMime[ext] || "unknown" : "unknown";
   }
 
   // Factory function to create a provider-specific object.
   function createProvider(providerName, apiKey, baseUrl) {
     var apiKey = apiKey || "";
     var baseUrl = baseUrl || "";
+
+    // These typically are provided on an individual request, but for conveninece we include ability to set at provider level.
+    var model = "";
+    var options = {};
     var contexts = [];
+
+    var providerObj = {
+      model: model,
+      options: options,
+      apiKey: apiKey,
+      baseUrl: baseUrl,
+      contexts: contexts
+    }
+
     var providerSupportsJSON = (providerName === "OpenAI" || providerName === "GeminiViaOpenAI");
 
-    function setApiKey(key) {
+    function setModel(modl) {
+      model = modl;
+      return providerObj;
+    }
+
+    function setOptions(optns) {
+      options = optns;
+      return providerObj;
+    }
+
+    function configureAPIKey(key) {
       apiKey = key;
       return providerObj;
     }
 
-    function setBaseUrl(url) {
+    function configureEndpoint(url) {
       baseUrl = url;
       return providerObj;
+    }
+
+    function getContext(noun) {
+      if (noun) {
+        return contexts.filter(context => { return context.key === noun; })
+      } else {
+        return contexts;
+      }
     }
 
     function addContext(noun, data) {
       // var dataString = (typeof data === "object") ? JSON.stringify(data, null, 2) : String(data);
       contexts.push({ key: noun, context: data });
+      return providerObj;
+    }
+
+    function clearContext(noun) {
+      if (noun) {
+        contexts = contexts.reduce((acc, item) => {
+          if (item.key === noun) {
+            return acc;
+          }
+          acc.push(item);
+          return acc;
+        }, []);
+      } else {
+        contexts = [];
+      }
       return providerObj;
     }
 
@@ -287,28 +239,198 @@ function createSalsifyAI() {
       }
     }
 
-    function extractJSON(content, coerceJSON) {
-      if (coerceJSON) {
-        try {
-          return JSON.parse(content);
-        } catch (e) {
-          // If parsing fails, leave content as is.
-          return content;
-        }
+    // Updated buildProviderMessage now includes providerName as first argument.
+    function buildProviderMessage(role, content) {
+      switch (providerName) {
+        case "Mistral":
+        case "Anthropic":
+        case "GeminiViaOpenAI":
+        case "OpenAI":
+          return [{ role: role, content: content }];
+        case "Gemini":
+          if (typeof content === "string") {
+            return [{ parts: [{ text: content }], role: "user" }];
+          } else {
+            return [{ parts: content, role: "user" }];
+          }
+        default:
+          throw new Error("Unsupported provider: " + providerName);
       }
-      return content;
     }
 
-    function callCompletion(prompt, params) {
+    function buildMessages(prompt) {
+      if (typeof prompt === "string") {
+        return buildProviderMessage("user", prompt);
+      } else if (Array.isArray(prompt)) {
+        return prompt.map(function(item) {
+          if (Array.isArray(item) && item.length === 2) {
+            // the [0] at the end of this line in unwrapping the single element array.
+            return buildProviderMessage(item[0], item[1])[0];
+          } else if (typeof item === "object" && item.hasOwnProperty("role") && item.hasOwnProperty("content")) {
+            return item;
+          } else {
+            throw new Error(`Invalid message format: each message must be a [role, content] tuple or an object with role and content. Got ${item}`);
+          }
+        });
+      } else {
+        throw new Error("Prompt must be a string or an array of messages or role/content tuples.");
+      }
+    }
+
+    // Build a request object based on provider specifics.
+    function buildRequest(apiKey, baseUrl, messages, params) {
+      var request = basePayload(params);
+
+      switch (providerName) {
+        case "OpenAI":
+          request.url = finalApiUrl(baseUrl, "/v1/chat/completions");
+          request.headers.Authorization = "Bearer " + apiKey;
+          request.payload = {
+            model: params.model || model || "gpt-4o",
+            messages: messages,
+            max_tokens: params.max_tokens || 1000
+          };
+          if (params.responseFormat) {
+            request.payload.response_format = {
+              json_schema: params.responseFormat,
+              type: 'json_schema'
+            };
+          }
+          break;
+
+        case "Anthropic":
+          request.url = finalApiUrl(baseUrl, "/v1/messages");
+          request.headers["x-api-key"] = apiKey;
+          request.headers["anthropic-version"] = "2023-06-01";
+          request.payload = {
+            model: params.model || "claude-3-5-sonnet-20241022",
+            max_tokens: params.max_tokens || 1024,
+            messages: messages
+          };
+          break;
+
+        case "Gemini":
+          request.url = finalApiUrl(baseUrl, "") + "?key=" + apiKey;
+          request.payload = {
+            contents: messages
+          };
+          if (params.max_tokens) {
+            request.payload.generationConfig = request.payload.generationConfig || {};
+            request.payload.generationConfig.maxOutputTokens = params.max_tokens;
+          }
+          if (params.responseFormat) {
+            request.payload.generationConfig = request.payload.generationConfig || {};
+            request.payload.generationConfig.responseMimeType = "application/json";
+            request.payload.generationConfig.responseSchema = convertResponseFormatForGemini(params.responseFormat);
+          }
+          break;
+
+        case "Mistral":
+          request.url = finalApiUrl(baseUrl, "/v1/chat/completions");
+          request.headers.Authorization = "Bearer " + apiKey;
+          request.headers.Accept = "application/json";
+          request.payload = {
+            model: params.model || "mistral-large-latest",
+            messages: messages
+          };
+          if (params.responseFormat) {
+            request.payload.response_format = { type: "json_object" };
+          }
+          break;
+
+        case "GeminiViaOpenAI":
+          request.url = finalApiUrl(baseUrl, "");
+          request.headers.Authorization = "Bearer " + apiKey;
+          request.payload = {
+            model: params.model || "gemini-2.0-flash",
+            messages: messages,
+            max_tokens: params.max_tokens || 1000
+          };
+          if (params.responseFormat) {
+            request.payload.response_format = {
+              json_schema: params.responseFormat,
+              type: 'json_schema'
+            };
+          }
+          break;
+
+        default:
+          throw new Error("Unsupported provider: " + providerName);
+      }
+
+      return request;
+    }
+
+    function buildTextAttachment(prompt) {
+      switch(providerName) {
+        case "OpenAI":
+        case "Mistral":
+        case "GeminiViaOpenAI":
+          return { "type": "text", "text": prompt };
+        case "Gemini":
+          return { "text": prompt };
+      }
+    }
+
+    function buildImageAttachment(imageUrl) {
+      switch(providerName) {
+        case "OpenAI":
+          return { "type": "image_url", "image_url": { "url": imageUrl } };
+        case "Mistral":
+          return { "type": "image_url", "image_url": imageUrl };
+        case "Gemini":
+          return { "inline_data": { "mime_type": guessMimeType(imageUrl), "data": download_file_base64(imageUrl) } };
+        case "GeminiViaOpenAI":
+          return { "type": "image_url", "image_url": { "url": `data:${guessMimeType(imageUrl)};base64,${download_file_base64(imageUrl)}` } };
+      }
+    }
+
+    function defaultImageModel() {
+      switch(providerName) {
+        case "OpenAI":
+          return "gpt-4o";
+        case "Mistral":
+          return "pixtral-12b-2409";
+        case "Gemini":
+        case "GeminiViaOpenAI":
+          return "gemini-2.0-flash";
+      }
+    }
+    // New method to support multi-modal image analysis.
+    function analyzeImage(imageUrls, prompt, params) {
+      if (!Array.isArray(imageUrls)) {
+        throw new Error("Image URLs must be provided as an array.");
+      }
+
+      if (providerName === "Anthropic") {
+        throw new Error(`Image analysis is not currently supported for ${providerName}.`)
+      }
+
+      params = params || {};
+      params = { ...options, ...params };
+
+      params["model"] = params["model"] || model || defaultImageModel();
+
+      var imageMessageTuples = imageUrls.map(imageUrl => {
+        var imageAttachment = buildImageAttachment(imageUrl);
+        return ["user", [imageAttachment]];
+      });
+
+      var textAttachment = buildTextAttachment(prompt);
+
+      imageMessageTuples.push(["user", [textAttachment]]);
+
+      return generateText(imageMessageTuples, params);
+    }
+
+    function generateText(prompt, params) {
       if (!apiKey) {
         throw new Error("No API key set for " + providerName + ".");
       }
       params = params || {};
+      params = { ...options, ...params };
 
-      // if (Array.isArray(prompt)) {
-      //   throw new Error(`These Prompts be whilllin Got ${prompt.length}, ${prompt}`);
-      // }
-      var messages = buildMessages(providerName, prompt);
+      var messages = buildMessages(prompt);
       // Ensure that the response format is valid if present, and if the provider doesn't support JSON append the format to the context as a directive to the LLM.
       if (params.responseFormat) {
         if (providerSupportsJSON) {
@@ -325,7 +447,7 @@ function createSalsifyAI() {
       // Serialize any added CONTEXTS to the request;
       serializeContext(messages);
 
-      var requestObject = buildRequest(providerName, apiKey, baseUrl, messages, params);
+      var requestObject = buildRequest(apiKey, baseUrl, messages, params);
 
       var response = requestObject; // default to the request so we can debug
       if (!requestObject.debugPrompt) {
@@ -341,90 +463,17 @@ function createSalsifyAI() {
       return response;
     }
 
-    function buildTextAttachment(providerName, prompt) {
-      switch(providerName) {
-        case "OpenAI":
-        case "Mistral":
-        case "GeminiViaOpenAI":
-          return { "type": "text", "text": prompt };
-        case "Gemini":
-          return { "text": prompt };
-      }
-    }
-
-    function buildImageAttachment(providerName, imageUrl) {
-      switch(providerName) {
-        case "OpenAI":
-          return { "type": "image_url", "image_url": { "url": imageUrl } };
-        case "Mistral":
-          return { "type": "image_url", "image_url": imageUrl };
-        case "Gemini":
-          return { "inline_data": { "mime_type": guessMimeType(imageUrl), "data": download_file_base64(imageUrl) } };
-        case "GeminiViaOpenAI":
-          return { "type": "image_url", "image_url": { "url": `data:${guessMimeType(imageUrl)};base64,${download_file_base64(imageUrl)}` } };
-      }
-    }
-
-    function defaultImageModel(provierName) {
-      switch(providerName) {
-        case "OpenAI":
-          return "gpt-4o";
-        case "Mistral":
-          return "pixtral-12b-2409";
-        case "Gemini":
-        case "GeminiViaOpenAI":
-          return "gemini-2.0-flash";
-      }
-    }
-
-    function guessMimeType(url) {
-      const extensionToMime = {
-        "png": "image/png",
-        "jpg": "image/jpeg",
-        "jpeg": "image/jpeg",
-        "webp": "image/webp",
-        "heic": "image/heic",
-        "heif": "image/heif"
-      };
-
-      // Extract file extension from the URL
-      const match = url.match(/\.([a-z0-9]+)(?:[\?#]|$)/i);
-      const ext = match ? match[1].toLowerCase() : null;
-
-      return ext ? extensionToMime[ext] || "unknown" : "unknown";
-    }
-    // New method to support multi-modal image analysis.
-    function callImageAnalysis(imageUrls, prompt, params) {
-      if (!Array.isArray(imageUrls)) {
-        throw new Error("Image URLs must be provided as an array.");
-      }
-
-      if (providerName === "Anthropic") {
-        throw new Error(`Image analysis is not currently supported for ${providerName}.`)
-      }
-
-      params = params || {};
-
-      params["model"] = params["model"] || defaultImageModel(providerName);
-
-      var imageMessageTuples = imageUrls.map(imageUrl => {
-        var imageAttachment = buildImageAttachment(providerName, imageUrl);
-        return ["user", [imageAttachment]];
-      });
-
-      var textAttachment = buildTextAttachment(providerName, prompt);
-
-      imageMessageTuples.push(["user", [textAttachment]]);
-
-      return callCompletion(imageMessageTuples, params);
-    }
-
-    var providerObj = {
-      setApiKey: setApiKey,
-      setBaseUrl: setBaseUrl,
+    providerObj = { 
+      ...providerObj,
+      configureAPIKey: configureAPIKey,
+      configureEndpoint: configureEndpoint,
+      getContext: getContext,
       addContext: addContext,
-      callCompletion: callCompletion,
-      callImageAnalysis: callImageAnalysis
+      setModel: setModel,
+      setOptions: setOptions,
+      clearContext: clearContext,
+      generateText: generateText,
+      analyzeImage: analyzeImage
     };
 
     return providerObj;

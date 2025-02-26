@@ -121,7 +121,7 @@ class TestJSAbstractions < Test::Unit::TestCase
   def test_salsify_ai_openai_provider
     js_code = <<~JS
       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
-      var response = provider.callCompletion("Test prompt", { debugPrompt: true, max_tokens: 150 });
+      var response = provider.generateText("Test prompt", { debugPrompt: true, max_tokens: 150 });
       response;
     JS
     result = @ctx.eval(js_code)
@@ -137,7 +137,7 @@ class TestJSAbstractions < Test::Unit::TestCase
    def test_openai_debug_prompt_with_string
      js_code = <<~JS
        var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
-       var response = provider.callCompletion("Simple prompt", { debugPrompt: true, max_tokens: 150 });
+       var response = provider.generateText("Simple prompt", { debugPrompt: true, max_tokens: 150 });
        response;
      JS
      result = @ctx.eval(js_code)
@@ -155,7 +155,7 @@ class TestJSAbstractions < Test::Unit::TestCase
    def test_openai_debug_prompt_with_array
      js_code = <<~JS
        var provider = SalsifyAI.openAIProvider("testkey");
-       var response = provider.callCompletion([["assistant", "Hello"], ["user", "How are you?"]], { debugPrompt: true, max_tokens: 200 });
+       var response = provider.generateText([["assistant", "Hello"], ["user", "How are you?"]], { debugPrompt: true, max_tokens: 200 });
        response;
      JS
      result = @ctx.eval(js_code)
@@ -172,7 +172,7 @@ class TestJSAbstractions < Test::Unit::TestCase
      js_code = <<~JS
        var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
        provider.addContext("Greeting", { msg: "Hello World" });
-       var response = provider.callCompletion("Prompt with context", { debugPrompt: true });
+       var response = provider.generateText("Prompt with context", { debugPrompt: true });
        response;
      JS
      result = @ctx.eval(js_code)
@@ -185,7 +185,7 @@ class TestJSAbstractions < Test::Unit::TestCase
    def test_openai_debug_response
      js_code = <<~JS
        var provider = SalsifyAI.openAIProvider("testkey");
-       var response = provider.callCompletion("Test prompt", { debugResponse: true, max_tokens: 150 });
+       var response = provider.generateText("Test prompt", { debugResponse: true, max_tokens: 150 });
        response;
      JS
      result = @ctx.eval(js_code)
@@ -197,7 +197,7 @@ class TestJSAbstractions < Test::Unit::TestCase
    def test_openai_invalid_response_format
      js_code = <<~JS
        var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
-       var response = provider.callCompletion("Test prompt", { debugPrompt: true, responseFormat: {} });
+       var response = provider.generateText("Test prompt", { debugPrompt: true, responseFormat: {} });
        response;
      JS
      result = @ctx.eval(js_code)
@@ -210,7 +210,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     js_code = <<~JS
       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
       // Supply an invalid responseFormat (missing required properties).
-      var result = provider.callCompletion("Test prompt", {debugPrompt: true, responseFormat: {}});
+      var result = provider.generateText("Test prompt", {debugPrompt: true, responseFormat: {}});
       result;
     JS
     result = @ctx.eval(js_code)
@@ -222,7 +222,7 @@ class TestJSAbstractions < Test::Unit::TestCase
   def test_salsify_ai_openai_provider_image_analysis
     js_code = <<~JS
       var provider = SalsifyAI.openAIProvider("fake-key");
-      var response = provider.callImageAnalysis(["https://foobar.png", "https://foobaz.jpg"], "Analyze these images", { debugPrompt: true });
+      var response = provider.analyzeImage(["https://foobar.png", "https://foobaz.jpg"], "Analyze these images", { debugPrompt: true });
       response;
     JS
     result = @ctx.eval(js_code)
@@ -263,7 +263,7 @@ class TestJSAbstractions < Test::Unit::TestCase
   def test_salsify_ai_openai_provider_image_analysis_model_override
     js_code = <<~JS
       var provider = SalsifyAI.openAIProvider("fake-key");
-      var response = provider.callImageAnalysis(["https://foobar.png", "https://foobaz.jpg"], "Analyze these images", { debugPrompt: true, model: "4o-mini" });
+      var response = provider.analyzeImage(["https://foobar.png", "https://foobaz.jpg"], "Analyze these images", { debugPrompt: true, model: "4o-mini" });
       response;
     JS
     result = @ctx.eval(js_code)
@@ -274,7 +274,7 @@ class TestJSAbstractions < Test::Unit::TestCase
   def test_salsify_ai_anthropic_provider
     js_code = <<~JS
       var provider = SalsifyAI.anthropicProvider("anthrokey", "https://api.anthropic.com");
-      var response = provider.callCompletion("Anthropic test", {debugPrompt: true, responseFormat: { "foo": "bar" }});
+      var response = provider.generateText("Anthropic test", {debugPrompt: true, responseFormat: { "foo": "bar" }});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -311,7 +311,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     }
     js_code = <<~JS
       var provider = SalsifyAI.geminiProvider("geminikey", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
-      var response = provider.callCompletion("Gemini test", {debugPrompt: true, max_tokens: 200, responseFormat: #{responseFormat.to_json}});
+      var response = provider.generateText("Gemini test", {debugPrompt: true, max_tokens: 200, responseFormat: #{responseFormat.to_json}});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -359,7 +359,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     }
     js_code = <<~JS
       var provider = SalsifyAI.geminiProvider("geminikey", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
-      var response = provider.callImageAnalysis(["https://foo.png"],"Caption this image", {debugPrompt: true});
+      var response = provider.analyzeImage(["https://foo.png"],"Caption this image", {debugPrompt: true});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -388,7 +388,7 @@ class TestJSAbstractions < Test::Unit::TestCase
   def test_salsify_ai_mistral_provider
     js_code = <<~JS
       var provider = SalsifyAI.mistralProvider("mistralkey", "https://api.mistral.ai");
-      var response = provider.callCompletion("Mistral test", {debugPrompt: true, responseFormat: {dummy: true}});
+      var response = provider.generateText("Mistral test", {debugPrompt: true, responseFormat: {dummy: true}});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -418,7 +418,7 @@ class TestJSAbstractions < Test::Unit::TestCase
   def test_salsify_ai_mistral_provider_image_analysis
     js_code = <<~JS
       var provider = SalsifyAI.mistralProvider("mistralkey", "https://api.mistral.ai");
-      var response = provider.callImageAnalysis(["https://foobar.png", "https://foobaz.jpg"], "Analyze these images", {debugPrompt: true, responseFormat: {dummy: true}});
+      var response = provider.analyzeImage(["https://foobar.png", "https://foobaz.jpg"], "Analyze these images", {debugPrompt: true, responseFormat: {dummy: true}});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -480,7 +480,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     js_code = <<~JS
       var provider = SalsifyAI.geminiViaOpenAIProvider("geminiOpenAIKey", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
       provider.addContext("SUper Context", "Duper Context");
-      var response = provider.callCompletion("GeminiViaOpenAI test", {debugPrompt: true, max_tokens: 250, responseFormat: #{responseFormat.to_json}});
+      var response = provider.generateText("GeminiViaOpenAI test", {debugPrompt: true, max_tokens: 250, responseFormat: #{responseFormat.to_json}});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -511,7 +511,7 @@ class TestJSAbstractions < Test::Unit::TestCase
   def test_salsify_ai_gemini_via_openai_provider_images
     js_code = <<~JS
       var provider = SalsifyAI.geminiViaOpenAIProvider("geminiOpenAIKey", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
-      var response = provider.callImageAnalysis(["https://foo.jpg"],"Caption this", {debugPrompt: true});
+      var response = provider.analyzeImage(["https://foo.jpg"],"Caption this", {debugPrompt: true});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -542,7 +542,7 @@ class TestJSAbstractions < Test::Unit::TestCase
       var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com/v1");
       provider.addContext("Greeting", {msg: "Hello"});
       provider.addContext("Footer", "Goodbye");
-      var response = provider.callCompletion("Base prompt", {debugPrompt: true});
+      var response = provider.generateText("Base prompt", {debugPrompt: true});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -567,7 +567,7 @@ class TestJSAbstractions < Test::Unit::TestCase
       credentials = File.read("credentials.txt").strip
       js_code = <<~JS
         var provider = SalsifyAI.openAIProvider("#{credentials}", "https://api.openai.com/v1");
-        var response = provider.callCompletion("Credential test", {debugPrompt: true});
+        var response = provider.generateText("Credential test", {debugPrompt: true});
         response;
       JS
       result = @ctx.eval(js_code)
@@ -576,5 +576,63 @@ class TestJSAbstractions < Test::Unit::TestCase
     else
       assert(true, "No credentials.txt file found; skipping credentials test.")
     end
+  end
+
+  def test_set_model_and_options
+    js_code = <<~JS
+      var provider = SalsifyAI.openAIProvider("testkey");
+      provider.setModel("test-model").setOptions({ "debugPrompt": true });
+      var response = provider.generateText("Test prompt");
+      response;
+    JS
+    result = @ctx.eval(js_code)
+    assert_equal("test-model", result["payload"]["model"], "Model mismatch")
+    assert_equal(true, result["debugPrompt"], "provider options mismatch")
+  end
+
+  def test_set_model_and_options_override
+    js_code = <<~JS
+      var provider = SalsifyAI.openAIProvider("testkey");
+      provider.setModel("test-model").setOptions({ "debugPrompt": true });
+      var response = provider.generateText("Test prompt", { "model": "cheeseballs" });
+      response;
+    JS
+    result = @ctx.eval(js_code)
+    assert_equal("cheeseballs", result["payload"]["model"], "Model mismatch")
+    assert_equal(true, result["debugPrompt"], "provider options mismatch")
+  end
+
+  def test_get_context
+    js_code = <<~JS
+      var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
+      provider.addContext("TestKey", { data: "TestData" });
+      provider.getContext("TestKey");
+    JS
+    result = @ctx.eval(js_code)
+    expected_context = [{ "key" => "TestKey", "context" => { "data" => "TestData" } }]
+    assert_equal(expected_context, result, "Context retrieval mismatch")
+  end
+
+  def test_clear_context
+    js_code = <<~JS
+      var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
+      provider.addContext("TestKey", { data: "TestData" });
+      provider.clearContext("TestKey");
+      provider.getContext();
+    JS
+    result = @ctx.eval(js_code)
+    assert_empty(result, "Context should be cleared")
+  end
+
+  def test_clear_all_contexts
+    js_code = <<~JS
+      var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
+      provider.addContext("TestKey1", { data: "TestData1" });
+      provider.addContext("TestKey2", { data: "TestData2" });
+      provider.clearContext();
+      provider.getContext();
+    JS
+    result = @ctx.eval(js_code)
+    assert_empty(result, "All contexts should be cleared")
   end
 end
