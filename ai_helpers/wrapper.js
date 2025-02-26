@@ -276,10 +276,7 @@ function createSalsifyAI() {
 
       switch (providerName) {
         case "Gemini":
-          return messages.unshift({ role: "user", parts: [ { inline_data: {
-          "mime_type": "application/json",
-          "data": JSON.stringify(contextObject)
-        } } ] });
+          return messages.unshift({ role: "user", parts: [{ text: JSON.stringify(contextObject) }] });
         default:
           return messages.unshift({ role: "user", content: JSON.stringify(contextObject) });
       }
