@@ -55,6 +55,21 @@ openAIProvider
   .configureEndpoint('https://api.openai.com');
 ```
 
+### Model and Options Configuration
+
+- `setModel(model)`: Sets the model to be used for API calls.
+- `setOptions(options)`: Sets additional options for the provider, such as responseFormat, max_tokens, and debugging flags.
+
+These methods allow for granular control over the provider's behavior and settings.
+
+### Context Management
+
+- `addContext(key, data)`: Adds context data to be included in API calls.
+- `getContext(key)`: Retrieves the current context data associated with the specified key.
+- `clearContext(key)`: Clears the context data associated with the specified key, or all context data if no key is provided.
+
+These methods facilitate the management of additional data that can be merged into prompts, enhancing the flexibility and relevance of API interactions.
+
 ## Adding Context
 
 You can add additional context that will be merged into your prompts on every API call. This is useful to supply background data or operational constraints.
@@ -302,7 +317,7 @@ Note: I've converted the measurements to metric units as commonly used in French
 ```
 ### Example: Text Completion with GeminiViaOpenAI
 
-GeminiViaOpenAI provides an interface to the Gemini model using a request format similar to OpenAI’s chat completions. This allows clients accustomed to OpenAI’s payload structure to leverage Gemini’s capabilities with minimal changes.
+GeminiViaOpenAI provides an interface to the Gemini model using a request format similar to OpenAI's chat completions. This allows clients accustomed to OpenAI's payload structure to leverage Gemini's capabilities with minimal changes.
 ```javascript
 var geminiViaOpenAIProvider = SalsifyAI.geminiViaOpenAIProvider(secret_value('gemini'));
 geminiViaOpenAIProvider.addContext('User Preferences', { tone: 'friendly', style: 'conversational' });
