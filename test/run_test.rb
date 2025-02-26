@@ -508,6 +508,34 @@ class TestJSAbstractions < Test::Unit::TestCase
     assert_equal(expected_responseFormat, result["payload"]["response_format"], "GeminiViaOpenAI responseFormat mismatch")
   end
 
+  def test_salsify_ai_gemini_via_openai_provider_images
+    js_code = <<~JS
+      var provider = SalsifyAI.geminiViaOpenAIProvider("geminiOpenAIKey", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
+      var response = provider.callImageAnalysis(["https://foo.jpg"],"Caption this", {debugPrompt: true});
+      response;
+    JS
+    result = @ctx.eval(js_code)
+
+    messages = result["payload"]["messages"]
+    expected_messages = [
+      {
+        "role": "user",
+        "content": [{
+          "type": "image_url",
+          "image_url": { "url": "data:image/jpeg;base64,BASE 64 THIS https://foo.jpg" }
+        }]
+      },
+      {
+        "role": "user",
+        "content": [{
+          "type": "text",
+          "text": "Caption this"
+        }]
+      }
+    ]
+    assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched");
+  end
+
   def test_add_context_chainability
     # Verify that addContext can be chained and affects the prompt.
     js_code = <<~JS

@@ -345,6 +345,7 @@ function createSalsifyAI() {
       switch(providerName) {
         case "OpenAI":
         case "Mistral":
+        case "GeminiViaOpenAI":
           return { "type": "text", "text": prompt };
         case "Gemini":
           return { "text": prompt };
@@ -359,6 +360,8 @@ function createSalsifyAI() {
           return { "type": "image_url", "image_url": imageUrl };
         case "Gemini":
           return { "inline_data": { "mime_type": guessMimeType(imageUrl), "data": download_file_base64(imageUrl) } };
+        case "GeminiViaOpenAI":
+          return { "type": "image_url", "image_url": { "url": `data:${guessMimeType(imageUrl)};base64,${download_file_base64(imageUrl)}` } };
       }
     }
 
@@ -369,6 +372,7 @@ function createSalsifyAI() {
         case "Mistral":
           return "pixtral-12b-2409";
         case "Gemini":
+        case "GeminiViaOpenAI":
           return "gemini-2.0-flash";
       }
     }
@@ -395,7 +399,7 @@ function createSalsifyAI() {
         throw new Error("Image URLs must be provided as an array.");
       }
 
-      if (providerName != "Mistral" && providerName != "OpenAI" && providerName != "Gemini") {
+      if (providerName === "Anthropic") {
         throw new Error(`Image analysis is not currently supported for ${providerName}.`)
       }
 
