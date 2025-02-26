@@ -10,6 +10,7 @@ The SalsifyAI library provides a unified, chainable interface for interacting wi
 5. [Making API Calls](#making-api-calls)
    - [Text Completion](#text-completion)
    - [Image Analysis (Multi-modal)](#image-analysis-multi-modal)
+   - [Image Generation](#image-generation)
 6. [Debugging Options](#debugging-options)
 7. [Response Format](#response-format)
 8. [Providers Supported](#providers-supported)
@@ -115,6 +116,21 @@ var response = openAIProvider.generateText('Tell me a joke about our product.', 
   "explanation": "Because it couldn't handle the comparison anymore! The joke plays on the word 'example', implying the product is used to set a standard or benchmark, making any comparison rival obsolete."
 }
 ```
+
+### Image Generation
+
+For the OpenAI provider, you can use the `generateImage` method to create images based on a text prompt. This method allows you to specify parameters such as the model, number of images, and image size.
+
+```javascript
+var imageResponse = openAIProvider.generateImage('A futuristic cityscape at sunset', {
+  model: 'dall-e-3',
+  n: 1,
+  size: '1024x1024',
+  quality: 'hd'
+});
+```
+
+This will generate an image using the specified model and parameters. The `generateImage` method is currently supported only for the OpenAI provider. Attempts to use this method with other providers will result in an error.
 
 ### Image Analysis (Multi-modal)
 

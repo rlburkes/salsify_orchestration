@@ -463,6 +463,32 @@ function createSalsifyAI() {
       return response;
     }
 
+    function generateImage(prompt, params) {
+      if (!apiKey) {
+        throw new Error("No API key set for " + providerName + ".");
+      }
+
+      if (providerName != "OpenAI") {
+        throw new Error(`Image generation is not currently supported for ${providerName}.`)
+      }
+
+      params = params || {};
+      params = { ...options, ...params };
+
+      var request = basePayload(params);
+      request.url = finalApiUrl(baseUrl, "/v1/images/generations");
+      request.headers.Authorization = "Bearer " + apiKey;
+      request.payload = {
+        model: params.model || "dall-e-3",
+        prompt: prompt,
+        n: params.n || 1,
+        size: params.size || "1024x1024",
+        quality: params.quality || "standard"
+      };
+
+      return performRequest(request);
+    }
+
     providerObj = { 
       ...providerObj,
       configureAPIKey: configureAPIKey,
@@ -473,7 +499,8 @@ function createSalsifyAI() {
       setOptions: setOptions,
       clearContext: clearContext,
       generateText: generateText,
-      analyzeImage: analyzeImage
+      analyzeImage: analyzeImage,
+      generateImage: generateImage
     };
 
     return providerObj;

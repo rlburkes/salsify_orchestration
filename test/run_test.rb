@@ -635,4 +635,35 @@ class TestJSAbstractions < Test::Unit::TestCase
     result = @ctx.eval(js_code)
     assert_empty(result, "All contexts should be cleared")
   end
+
+  def test_salsify_ai_openai_provider_generate_image
+    js_code = <<~JS
+      var provider = SalsifyAI.openAIProvider("testkey", "https://api.openai.com");
+      var response = provider.generateImage("a white siamese cat", { quality: "hd", debugPrompt: true });
+      response;
+    JS
+    result = @ctx.eval(js_code)
+    assert_equal("https://api.openai.com/v1/images/generations", result["url"], "OpenAI Image Generation URL mismatch")
+    assert_equal("Bearer testkey", result["headers"]["Authorization"], "Authorization header mismatch")
+    assert_equal("dall-e-3", result["payload"]["model"], "Model mismatch")
+    assert_equal("a white siamese cat", result["payload"]["prompt"], "Prompt mismatch")
+    assert_equal(1, result["payload"]["n"], "Number of images mismatch")
+    assert_equal("1024x1024", result["payload"]["size"], "Image size mismatch")
+    assert_equal("hd", result["payload"]["quality"], "Image quality mismatch")
+  end
+
+  def test_non_openai_provider_generate_image_error
+    js_code = <<~JS
+      var provider = SalsifyAI.anthropicProvider("testkey", "https://api.anthropic.com");
+      var response = "";
+      try {
+        provider.generateImage("a white siamese cat", { debugPrompt: true });
+      } catch (e) {
+        response = e.message;
+      }
+      response
+    JS
+    result = @ctx.eval(js_code)
+    assert_equal("Image generation is not currently supported for Anthropic.", result, "Expected error message for unsupported provider")
+  end
 end
