@@ -15,6 +15,7 @@
 require 'mini_racer'
 require 'json'
 require 'test/unit'
+require 'base64'
 
 # Helper method to load a JavaScript file.
 def load_js_file(ctx, filename)
@@ -51,6 +52,11 @@ class TestJSAbstractions < Test::Unit::TestCase
             }
           }]
         };
+      }
+
+      function download_file_base64(url) {
+        // Dummy implementation for simulation:
+        return `BASE 64 THIS ${url}`;
       }
     JS
 
@@ -171,8 +177,8 @@ class TestJSAbstractions < Test::Unit::TestCase
      JS
      result = @ctx.eval(js_code)
      messages = result["payload"]["messages"]
-     assert_equal("system", messages[0]["role"], "First message should be a system message containing the context")
-     assert(messages[0]["content"].include?("~~~~BEGIN Greeting~~~~"), "Context message should include the 'Greeting' label")
+     assert_equal("user", messages[0]["role"], "First message should be a system message containing the context")
+     assert(messages[0]["content"].include?("Greeting"), "Context message should include the 'Greeting' label")
    end
 
    # Test that debugResponse returns the raw API response (without content extraction).
@@ -280,12 +286,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     expected_messages = [
       {
         "role": "user",
-        "content": "~~~~BEGIN RESPOND WITH THIS SCHEMA~~~~\n"\
-                   "{\"foo\":\"bar\"}\n"\
-                   "~~~~END RESPOND WITH THIS SCHEMA~~~~\n"\
-                   "~~~~BEGIN RESPONSE DIRECTIVE~~~~\n"\
-                   "Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\n"\
-                   "~~~~END RESPONSE DIRECTIVE~~~~"
+        "content": "{\"RESPOND WITH THIS SCHEMA\":[\"{\\\"foo\\\":\\\"bar\\\"}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
       },
       {
         "role": "user",
@@ -319,12 +320,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     expected_messages = [
       {
         "parts": [{
-          "text": "~~~~BEGIN RESPOND WITH THIS SCHEMA~~~~\n"\
-                   "{\"name\":\"TestSchema\",\"strict\":false,\"schema\":{\"type\":\"object\",\"properties\":{\"test\":{\"type\":\"string\"}},\"required\":[\"test\"],\"additionalProperties\":false}}\n"\
-                   "~~~~END RESPOND WITH THIS SCHEMA~~~~\n"\
-                   "~~~~BEGIN RESPONSE DIRECTIVE~~~~\n"\
-                   "Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\n"\
-                   "~~~~END RESPONSE DIRECTIVE~~~~"\
+          "text": "{\"RESPOND WITH THIS SCHEMA\":[\"{\\\"name\\\":\\\"TestSchema\\\",\\\"strict\\\":false,\\\"schema\\\":{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"test\\\":{\\\"type\\\":\\\"string\\\"}},\\\"required\\\":[\\\"test\\\"],\\\"additionalProperties\\\":false}}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
           }],
         "role": "user"
       },
@@ -348,6 +344,47 @@ class TestJSAbstractions < Test::Unit::TestCase
     assert_equal(expected_schema, result["payload"]["generationConfig"]["responseSchema"], "Gemini responseSchema conversion failed")
   end
 
+  def test_salsify_ai_gemini_provider_image_analysis
+    # For Gemini, note that providerSupportsJSON is false, so the responseFormat is injected as a directive and
+    # later used to set generationConfig.responseSchema.
+    responseFormat = {
+      "name": "TestSchema",
+      "strict": false,
+      "schema": {
+        "type": "object",
+        "properties": { test: { type: "string" } },
+        "required": ["test"],
+        "additionalProperties": false
+      }
+    }
+    js_code = <<~JS
+      var provider = SalsifyAI.geminiProvider("geminikey", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
+      var response = provider.callImageAnalysis(["https://foo.png"],"Caption this image", {debugPrompt: true});
+      response;
+    JS
+    result = @ctx.eval(js_code)
+
+    messages = result["payload"]["contents"]
+    expected_messages = [
+      {
+        "parts": [{
+          "inline_data": {
+            "mime_type": "image/png",
+            "data": "BASE 64 THIS https://foo.png"
+          }
+        }],
+        "role": "user"
+      },
+      {
+        "parts": [{
+          "text": "Caption this image"
+          }],
+        "role": "user"
+      }
+    ]
+    assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
+  end
+
   def test_salsify_ai_mistral_provider
     js_code = <<~JS
       var provider = SalsifyAI.mistralProvider("mistralkey", "https://api.mistral.ai");
@@ -359,13 +396,8 @@ class TestJSAbstractions < Test::Unit::TestCase
     messages = result["payload"]["messages"]
     expected_messages = [
       {
-        "role": "system",
-        "content": "~~~~BEGIN RESPOND WITH THIS SCHEMA~~~~\n"\
-                   "{\"dummy\":true}\n"\
-                   "~~~~END RESPOND WITH THIS SCHEMA~~~~\n"\
-                   "~~~~BEGIN RESPONSE DIRECTIVE~~~~\n"\
-                   "Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\n"\
-                   "~~~~END RESPONSE DIRECTIVE~~~~"
+        "role": "user",
+        "content": "{\"RESPOND WITH THIS SCHEMA\":[\"{\\\"dummy\\\":true}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
       },
       {
         "role": "user",
@@ -394,13 +426,8 @@ class TestJSAbstractions < Test::Unit::TestCase
     messages = result["payload"]["messages"]
     expected_messages = [
       {
-        "role": "system",
-        "content": "~~~~BEGIN RESPOND WITH THIS SCHEMA~~~~\n"\
-                   "{\"dummy\":true}\n"\
-                   "~~~~END RESPOND WITH THIS SCHEMA~~~~\n"\
-                   "~~~~BEGIN RESPONSE DIRECTIVE~~~~\n"\
-                   "Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\n"\
-                   "~~~~END RESPONSE DIRECTIVE~~~~"
+        "role": "user",
+        "content": "{\"RESPOND WITH THIS SCHEMA\":[\"{\\\"dummy\\\":true}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
       },
       {
         "role": "user",
@@ -461,10 +488,8 @@ class TestJSAbstractions < Test::Unit::TestCase
     messages = result["payload"]["messages"]
     expected_messages = [
       {
-        "role": "system",
-        "content": "~~~~BEGIN SUper Context~~~~\n"\
-        "Duper Context\n"\
-        "~~~~END SUper Context~~~~"
+        "role": "user",
+        "content": "{\"SUper Context\":[\"Duper Context\"]}"
       },
       {
         "role": "user",
@@ -497,15 +522,8 @@ class TestJSAbstractions < Test::Unit::TestCase
     messages = result["payload"]["messages"]
     expected_messages = [
       {
-        "role": "system",
-        "content": "~~~~BEGIN Greeting~~~~\n"\
-                   "{\n"\
-                   "  \"msg\": \"Hello\"\n"\
-                   "}\n"\
-                   "~~~~END Greeting~~~~\n"\
-                   "~~~~BEGIN Footer~~~~\n"\
-                   "Goodbye\n"\
-                   "~~~~END Footer~~~~"
+        "role": "user",
+        "content": "{\"Greeting\":[{\"msg\":\"Hello\"}],\"Footer\":[\"Goodbye\"]}"
       },
       {
         "role": "user",

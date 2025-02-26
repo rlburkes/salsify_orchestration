@@ -99,7 +99,11 @@ function createSalsifyAI() {
       case "OpenAI":
         return [{ role: role, content: content }];
       case "Gemini":
-        return [{ parts: [{ text: content }], role: "user" }];
+        if (typeof content === "string") {
+          return [{ parts: [{ text: content }], role: "user" }];
+        } else {
+          return [{ parts: content, role: "user" }];
+        }
       default:
         throw new Error("Unsupported provider: " + providerName);
     }
@@ -111,7 +115,8 @@ function createSalsifyAI() {
     } else if (Array.isArray(prompt)) {
       return prompt.map(function(item) {
         if (Array.isArray(item) && item.length === 2) {
-          return { role: item[0], content: item[1] };
+          // the [0] at the end of this line in unwrapping the single element array.
+          return buildProviderMessage(providerName, item[0], item[1])[0];
         } else if (typeof item === "object" && item.hasOwnProperty("role") && item.hasOwnProperty("content")) {
           return item;
         } else {
@@ -336,26 +341,76 @@ function createSalsifyAI() {
       return response;
     }
 
+    function buildTextAttachment(providerName, prompt) {
+      switch(providerName) {
+        case "OpenAI":
+        case "Mistral":
+          return { "type": "text", "text": prompt };
+        case "Gemini":
+          return { "text": prompt };
+      }
+    }
+
+    function buildImageAttachment(providerName, imageUrl) {
+      switch(providerName) {
+        case "OpenAI":
+          return { "type": "image_url", "image_url": { "url": imageUrl } };
+        case "Mistral":
+          return { "type": "image_url", "image_url": imageUrl };
+        case "Gemini":
+          return { "inline_data": { "mime_type": guessMimeType(imageUrl), "data": download_file_base64(imageUrl) } };
+      }
+    }
+
+    function defaultImageModel(provierName) {
+      switch(providerName) {
+        case "OpenAI":
+          return "gpt-4o";
+        case "Mistral":
+          return "pixtral-12b-2409";
+        case "Gemini":
+          return "gemini-2.0-flash";
+      }
+    }
+
+    function guessMimeType(url) {
+      const extensionToMime = {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "webp": "image/webp",
+        "heic": "image/heic",
+        "heif": "image/heif"
+      };
+
+      // Extract file extension from the URL
+      const match = url.match(/\.([a-z0-9]+)(?:[\?#]|$)/i);
+      const ext = match ? match[1].toLowerCase() : null;
+
+      return ext ? extensionToMime[ext] || "unknown" : "unknown";
+    }
     // New method to support multi-modal image analysis.
     function callImageAnalysis(imageUrls, prompt, params) {
       if (!Array.isArray(imageUrls)) {
         throw new Error("Image URLs must be provided as an array.");
       }
 
-      if (providerName != "Mistral" && providerName != "OpenAI") {
+      if (providerName != "Mistral" && providerName != "OpenAI" && providerName != "Gemini") {
         throw new Error(`Image analysis is not currently supported for ${providerName}.`)
       }
 
       params = params || {};
 
-      params["model"] = params["model"] || ((providerName === "OpenAI")? "gpt-4o" : "pixtral-12b-2409")
-      // Build an image message. Here we simply join the image URLs into a text string.
+      params["model"] = params["model"] || defaultImageModel(providerName);
+
       var imageMessageTuples = imageUrls.map(imageUrl => {
-        var img = (providerName === "OpenAI") ? { "url": imageUrl } : imageUrl;
-        return ["user", [{ "type": "image_url", "image_url": img }]];
+        var imageAttachment = buildImageAttachment(providerName, imageUrl);
+        return ["user", [imageAttachment]];
       });
 
-      imageMessageTuples.push(["user", [{ "type": "text", "text": prompt }]]);
+      var textAttachment = buildTextAttachment(providerName, prompt);
+
+      imageMessageTuples.push(["user", [textAttachment]]);
 
       return callCompletion(imageMessageTuples, params);
     }
