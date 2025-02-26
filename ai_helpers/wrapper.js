@@ -238,9 +238,8 @@ function createSalsifyAI() {
     }
 
     function addContext(noun, data) {
-      var dataString = (typeof data === "object") ? JSON.stringify(data, null, 2) : String(data);
-      var contextStr = "~~~~BEGIN " + noun + "~~~~\n" + dataString + "\n~~~~END " + noun + "~~~~";
-      contexts.push(contextStr);
+      // var dataString = (typeof data === "object") ? JSON.stringify(data, null, 2) : String(data);
+      contexts.push({ key: noun, context: data });
       return providerObj;
     }
 
@@ -267,13 +266,19 @@ function createSalsifyAI() {
         return contexts;
       }
 
+      var contextObject = contexts.reduce((acc, { key, context }) => {
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(context);
+        return acc;
+      }, {});
+
       switch (providerName) {
-        case "Anthropic":
-          return messages.unshift({ role: "user", content: contexts.join("\n") });
         case "Gemini":
           return messages.unshift({ role: "user", parts: [ { text: contexts.join("\n") } ] });
         default:
-          return messages.unshift({ role: "system", content: contexts.join("\n") });
+          return messages.unshift({ role: "user", content: contextObject });
       }
     }
 
