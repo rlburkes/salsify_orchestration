@@ -131,6 +131,19 @@ function createSalsifyAI() {
     return ext ? extensionToMime[ext] || "unknown" : "unknown";
   }
 
+  function toYAML(obj, indent = 0) {
+    const spacing = "  ".repeat(indent);
+    if (Array.isArray(obj)) {
+        return obj.map(item => `${spacing}- ${toYAML(item, indent + 1)}`).join("\n");
+    } else if (typeof obj === "object" && obj !== null) {
+        return Object.entries(obj)
+            .map(([key, value]) => `${spacing}${key}: ${toYAML(value, indent + 1)}`)
+            .join("\n");
+    } else {
+        return String(obj);
+    }
+  }
+
   // Factory function to create a provider-specific object.
   function createProvider(providerName, apiKey, baseUrl) {
     var apiKey = apiKey || "";
@@ -233,9 +246,9 @@ function createSalsifyAI() {
 
       switch (providerName) {
         case "Gemini":
-          return messages.unshift({ role: "user", parts: [{ text: JSON.stringify(contextObject) }] });
+          return messages.unshift({ role: "user", parts: [{ text: toYAML(contextObject) }] });
         default:
-          return messages.unshift({ role: "user", content: JSON.stringify(contextObject) });
+          return messages.unshift({ role: "user", content: toYAML(contextObject) });
       }
     }
 
@@ -489,7 +502,7 @@ function createSalsifyAI() {
       return performRequest(request);
     }
 
-    providerObj = { 
+    providerObj = {
       ...providerObj,
       configureAPIKey: configureAPIKey,
       configureEndpoint: configureEndpoint,
