@@ -246,9 +246,9 @@ function createSalsifyAI() {
 
       switch (providerName) {
         case "Gemini":
-          return messages.unshift({ role: "user", parts: [{ text: toYAML(contextObject) }] });
+          return messages.unshift({ role: "user", parts: [{ text: JSON.stringify(contextObject) }] });
         default:
-          return messages.unshift({ role: "user", content: toYAML(contextObject) });
+          return messages.unshift({ role: "user", content: JSON.stringify(contextObject) });
       }
     }
 
@@ -301,7 +301,7 @@ function createSalsifyAI() {
           request.payload = {
             model: params.model || model || "gpt-4o",
             messages: messages,
-            max_tokens: params.max_tokens || 1000
+            max_completion_tokens: params.max_tokens || 1200
           };
           if (params.responseFormat) {
             request.payload.response_format = {

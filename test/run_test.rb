@@ -127,7 +127,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     result = @ctx.eval(js_code)
     assert_equal("https://api.openai.com/v1/chat/completions", result["url"], "OpenAI URL mismatch")
     assert_equal("Bearer testkey", result["headers"]["Authorization"], "Authorization header mismatch")
-    assert_equal(150, result["payload"]["max_tokens"], "max_tokens value mismatch")
+    assert_equal(150, result["payload"]["max_completion_tokens"], "max_tokens value mismatch")
     messages = result["payload"]["messages"]
     assert_not_nil(messages, "Messages payload missing")
     assert_equal("Test prompt", messages[0]["content"], "Prompt message mismatch")
@@ -143,7 +143,7 @@ class TestJSAbstractions < Test::Unit::TestCase
      result = @ctx.eval(js_code)
      assert_equal("https://api.openai.com/v1/chat/completions", result["url"], "OpenAI URL mismatch")
      assert_equal("Bearer testkey", result["headers"]["Authorization"], "Authorization header mismatch")
-     assert_equal(150, result["payload"]["max_tokens"], "max_tokens value mismatch")
+     assert_equal(150, result["payload"]["max_completion_tokens"], "max_tokens value mismatch")
      messages = result["payload"]["messages"]
      assert(messages.is_a?(Array), "Messages should be an array")
      # When a string prompt is provided, it should be converted to a single message with role 'user'
