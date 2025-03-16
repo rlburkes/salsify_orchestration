@@ -296,7 +296,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
   end
 
-  def test_salsify_ai_gemini_provider
+  def test_salsify_ai_gemini_providera
     # For Gemini, note that providerSupportsJSON is false, so the responseFormat is injected as a directive and
     # later used to set generationConfig.responseSchema.
     responseFormat = {
@@ -342,6 +342,77 @@ class TestJSAbstractions < Test::Unit::TestCase
     # The responseSchema should be the schema with additionalProperties removed.
     expected_schema = { "type" => "object", "properties" => { "test" => { "type" => "string" } }, "required" => ["test"] }
     assert_equal(expected_schema, result["payload"]["generationConfig"]["responseSchema"], "Gemini responseSchema conversion failed")
+  end
+
+  def test_salsify_ai_gemini_provider
+    # For Gemini, note that providerSupportsJSON is false, so the responseFormat is injected as a directive and
+    # later used to set generationConfig.responseSchema.
+    responseFormat = {
+      "name": "TestSchema",
+      "strict": true,
+      "schema": {
+        "type": "object",
+        "properties": {
+          "test": {
+            "type": "object",
+            "properties": {
+              "nested_key": { "type": "string" }
+            },
+            "required": ["nested_key"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["test"],
+        "additionalProperties": false
+      }
+    }
+
+    js_code = <<~JS
+      var provider = SalsifyAI.geminiProvider("geminikey", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
+      var response = provider.generateText("Gemini test", {debugPrompt: true, max_tokens: 200, responseFormat: #{responseFormat.to_json}});
+      response;
+    JS
+    result = @ctx.eval(js_code)
+
+    messages = result["payload"]["contents"]
+    expected_messages = [
+      {
+        "parts" => [{
+          "text": "{\"RESPOND WITH THIS SCHEMA\":[\"{\\\"name\\\":\\\"TestSchema\\\",\\\"strict\\\":true,\\\"schema\\\":{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"test\\\":{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"nested_key\\\":{\\\"type\\\":\\\"string\\\"}},\\\"required\\\":[\\\"nested_key\\\"],\\\"additionalProperties\\\":false}},\\\"required\\\":[\\\"test\\\"],\\\"additionalProperties\\\":false}}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
+        }],
+        "role" => "user"
+      },
+      {
+        "parts" => [{
+          "text" => "Gemini test"
+        }],
+        "role" => "user"
+      }
+    ]
+    assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
+
+    # The URL should include the API key as a query parameter.
+    expected_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=geminikey"
+    assert_equal(expected_url, result["url"], "Gemini URL mismatch")
+    # Verify that max_tokens and the generationConfig are set.
+    assert_equal(200, result["payload"]["generationConfig"] && result["payload"]["generationConfig"]["maxOutputTokens"], "max_tokens mismatch for Gemini")
+    assert_equal("application/json", result["payload"]["generationConfig"]["responseMimeType"], "Response MIME type mismatch for Gemini")
+
+    # The responseSchema should be the schema with additionalProperties removed.
+    expected_schema = {
+      "type": "object",
+      "properties": {
+        "test": {
+          "type": "object",
+          "properties": {
+            "nested_key": { "type": "string" }
+          },
+          "required": ["nested_key"]
+        }
+      },
+      "required": ["test"]
+    }
+    assert_equal(deep_stringify_keys(expected_schema), result["payload"]["generationConfig"]["responseSchema"], "Gemini responseSchema conversion failed")
   end
 
   def test_salsify_ai_gemini_provider_image_analysis

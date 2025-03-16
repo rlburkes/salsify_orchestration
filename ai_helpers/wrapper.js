@@ -44,17 +44,44 @@ function createSalsifyAI() {
   }
   // Converts response format for Gemini provider.
   function convertResponseFormatForGemini(responseFormat) {
-    if (typeof responseFormat !== "object" || responseFormat === null) {
-      return responseFormat;
-    }
-    if (responseFormat.hasOwnProperty("schema")) {
-      var newSchema = JSON.parse(JSON.stringify(responseFormat.schema));
-      if (newSchema.hasOwnProperty("additionalProperties")) {
-        delete newSchema.additionalProperties;
+      if (typeof responseFormat !== "object" || responseFormat === null) {
+          return responseFormat;
       }
-      return newSchema;
-    }
-    return responseFormat;
+
+      if (responseFormat.hasOwnProperty("schema")) {
+          // Deep clone the schema to avoid modifying the original object
+          var newSchema = JSON.parse(JSON.stringify(responseFormat.schema));
+
+          function removeAdditionalProperties(obj) {
+              if (typeof obj !== "object" || obj === null) return obj;
+
+              // Create a shallow copy to maintain immutability
+              var cleanedObj = { ...obj };
+
+              // Remove `additionalProperties` if it exists
+              if (cleanedObj.hasOwnProperty("additionalProperties")) {
+                  delete cleanedObj.additionalProperties;
+              }
+
+              // Recursively process nested objects in `properties` and `items`
+              if (cleanedObj.hasOwnProperty("properties")) {
+                  cleanedObj.properties = Object.fromEntries(
+                      Object.entries(cleanedObj.properties).map(([key, value]) => [key, removeAdditionalProperties(value)])
+                  );
+              }
+
+              if (cleanedObj.hasOwnProperty("items")) {
+                  cleanedObj.items = removeAdditionalProperties(cleanedObj.items);
+              }
+
+              return cleanedObj;
+          }
+
+          // Generate the cleaned version of the schema
+          return removeAdditionalProperties(newSchema);
+      }
+
+      return responseFormat;
   }
 
   function validateResponseFormat(respFormat) {
