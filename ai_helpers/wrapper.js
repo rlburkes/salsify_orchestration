@@ -9,16 +9,27 @@
  */
 function createSalsifyAI() {
 
+
+  function scrubHeaders(requestObject) {
+    if (requestObject.headers.Authorization) {
+      requestObject.headers['Authorization'] = 'REDACTED';
+    }
+    if (requestObject.headers['x-api-key']) {
+      requestObject.headers['x-api-key'] = 'REDACTED'
+    }
+    return requestObject;
+  }
+
   // A shared function to perform the web request using the built request object.
   function performRequest(requestObject) {
     try {
       if (requestObject.debugPrompt) {
-        return requestObject;
+        return scrubHeaders(requestObject);
       } else {
         return web_request(requestObject.url, requestObject.method, requestObject.payload, requestObject.headers);
       }
     } catch (e) {
-      return { "status": "failure", "request": requestObject, "message": e };
+      return { "status": "failure", "request": scrubHeaders(requestObject), "message": e };
     }
   }
 
@@ -495,6 +506,9 @@ function createSalsifyAI() {
       }
 
       if (requestObject.debugResponse || requestObject.debugPrompt) {
+        if (requestObject.debugPrompt) {
+          scrubHeaders(response);
+        }
         return response;
       } else {
         response = extractJSON(extractContent(response), params.responseFormat || false);

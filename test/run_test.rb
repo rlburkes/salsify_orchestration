@@ -126,7 +126,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     JS
     result = @ctx.eval(js_code)
     assert_equal("https://api.openai.com/v1/chat/completions", result["url"], "OpenAI URL mismatch")
-    assert_equal("Bearer testkey", result["headers"]["Authorization"], "Authorization header mismatch")
+    assert_equal("REDACTED", result["headers"]["Authorization"], "Authorization header mismatch")
     assert_equal(150, result["payload"]["max_completion_tokens"], "max_tokens value mismatch")
     messages = result["payload"]["messages"]
     assert_not_nil(messages, "Messages payload missing")
@@ -142,7 +142,7 @@ class TestJSAbstractions < Test::Unit::TestCase
      JS
      result = @ctx.eval(js_code)
      assert_equal("https://api.openai.com/v1/chat/completions", result["url"], "OpenAI URL mismatch")
-     assert_equal("Bearer testkey", result["headers"]["Authorization"], "Authorization header mismatch")
+     assert_equal("REDACTED", result["headers"]["Authorization"], "Authorization header mismatch")
      assert_equal(150, result["payload"]["max_completion_tokens"], "max_tokens value mismatch")
      messages = result["payload"]["messages"]
      assert(messages.is_a?(Array), "Messages should be an array")
@@ -279,7 +279,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     JS
     result = @ctx.eval(js_code)
     assert_equal("https://api.anthropic.com/v1/messages", result["url"], "Anthropic URL mismatch")
-    assert_equal("anthrokey", result["headers"]["x-api-key"], "API key header mismatch")
+    assert_equal("REDACTED", result["headers"]["x-api-key"], "API key header mismatch")
     assert_equal("2023-06-01", result["headers"]["anthropic-version"], "Anthropic version header mismatch")
 
     messages = result["payload"]["messages"]
@@ -479,7 +479,7 @@ class TestJSAbstractions < Test::Unit::TestCase
 
     expected_url = "https://api.mistral.ai/v1/chat/completions"
     assert_equal(expected_url, result["url"], "Mistral URL mismatch")
-    assert_equal("Bearer mistralkey", result["headers"]["Authorization"], "Mistral Authorization header mismatch")
+    assert_equal("REDACTED", result["headers"]["Authorization"], "Mistral Authorization header mismatch")
     assert_equal("application/json", result["headers"]["Accept"], "Mistral Accept header mismatch")
 
     # For Mistral, any provided responseFormat is converted to a fixed { type: 'json_object' }.
@@ -527,7 +527,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     expected_url = "https://api.mistral.ai/v1/chat/completions"
     assert_equal(expected_url, result["url"], "Mistral URL mismatch")
 
-    assert_equal("Bearer mistralkey", result["headers"]["Authorization"], "Mistral Authorization header mismatch")
+    assert_equal("REDACTED", result["headers"]["Authorization"], "Mistral Authorization header mismatch")
     assert_equal("application/json", result["headers"]["Accept"], "Mistral Accept header mismatch")
 
     expected_model = "pixtral-12b-2409"
@@ -571,7 +571,7 @@ class TestJSAbstractions < Test::Unit::TestCase
 
     expected_url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
     assert_equal(expected_url, result["url"], "GeminiViaOpenAI URL mismatch")
-    assert_equal("Bearer geminiOpenAIKey", result["headers"]["Authorization"], "GeminiViaOpenAI Authorization header mismatch")
+    assert_equal("REDACTED", result["headers"]["Authorization"], "GeminiViaOpenAI Authorization header mismatch")
     assert_equal(250, result["payload"]["max_tokens"], "GeminiViaOpenAI max_tokens mismatch")
 
     # The responseFormat should be embedded as { json_schema: <provided schema>, type: 'json_schema' }.
@@ -642,7 +642,7 @@ class TestJSAbstractions < Test::Unit::TestCase
         response;
       JS
       result = @ctx.eval(js_code)
-      expected_header = "Bearer #{credentials}"
+      expected_header = "REDACTED"
       assert_equal(expected_header, result["headers"]["Authorization"], "Credentials not injected correctly")
     else
       assert(true, "No credentials.txt file found; skipping credentials test.")
@@ -715,7 +715,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     JS
     result = @ctx.eval(js_code)
     assert_equal("https://api.openai.com/v1/images/generations", result["url"], "OpenAI Image Generation URL mismatch")
-    assert_equal("Bearer testkey", result["headers"]["Authorization"], "Authorization header mismatch")
+    assert_equal("REDACTED", result["headers"]["Authorization"], "Authorization header mismatch")
     assert_equal("dall-e-3", result["payload"]["model"], "Model mismatch")
     assert_equal("a white siamese cat", result["payload"]["prompt"], "Prompt mismatch")
     assert_equal(1, result["payload"]["n"], "Number of images mismatch")
