@@ -17,6 +17,13 @@ function createSalsifyAI() {
     if (requestObject.headers['x-api-key']) {
       requestObject.headers['x-api-key'] = 'REDACTED'
     }
+    if (requestObject.headers['api-key']) {
+      requestObject.headers['api-key'] = 'REDACTED'
+    }
+    if (typeof requestObject.url === 'string' &&
+    requestObject.url.indexOf('generativelanguage.googleapis.com') !== -1) {
+      requestObject.url = requestObject.url.replace(/([?&])key=[^&]+/, '$1key=REDACTED');
+    }
     return requestObject;
   }
 
@@ -200,7 +207,7 @@ function createSalsifyAI() {
       contexts: contexts
     }
 
-    var providerSupportsJSON = (providerName === "OpenAI" || providerName === "GeminiViaOpenAI");
+    var providerSupportsJSON = (providerName === "OpenAI" || providerName === "AzureAIFoundry" || providerName === "GeminiViaOpenAI");
 
     function setModel(modl) {
       model = modl;
@@ -254,6 +261,7 @@ function createSalsifyAI() {
     function extractContent(response) {
       switch (providerName) {
         case "OpenAI":
+        case "AzureAIFoundry":
         case "GeminiViaOpenAI":
           return response.choices && response.choices[0].message ? response.choices[0].message.content : "";
         case "Anthropic":
@@ -296,6 +304,7 @@ function createSalsifyAI() {
         case "Mistral":
         case "Anthropic":
         case "GeminiViaOpenAI":
+        case "AzureAIFoundry":
         case "OpenAI":
           return [{ role: role, content: content }];
         case "Gemini":
@@ -349,6 +358,36 @@ function createSalsifyAI() {
           }
           break;
 
+        case "AzureAIFoundry":
+          request.url = finalApiUrl(baseUrl, "/chat/completions?api-version=2024-10-21");
+          request.headers["api-key"] = apiKey;
+          request.payload = {
+            temperature: params.temperature || 1,
+            top_p: params.top_p || 1,
+            stop: params.stop || null,
+            max_tokens: params.max_tokens || null,
+            max_completion_tokens: params.max_completion_tokens || 1200,
+            presence_penalty: params.presence_penalty || 0,
+            frequency_penalty: params.frequency_penalty || 0,
+            logit_bias: params.logit_bias || null,
+            user: params.user || null,
+            messages: messages,
+            data_sources: params.data_sources || null,
+            logprobs: params.logprobs || null,
+            n: params.n || 1,
+            parrallel_tool_calls: params.parallel_tool_calls || true,
+            tools: params.tools || null,
+            tool_choices: params.tool_choices || null,
+            seed: params.seed || null
+          };
+          if (params.responseFormat) {
+            request.payload.response_format = {
+              json_schema: params.responseFormat,
+              type: 'json_schema'
+            };
+          }
+          break;
+
         case "Anthropic":
           request.url = finalApiUrl(baseUrl, "/v1/messages");
           request.headers["x-api-key"] = apiKey;
@@ -361,7 +400,7 @@ function createSalsifyAI() {
           break;
 
         case "Gemini":
-          request.url = finalApiUrl(baseUrl, "") + "?key=" + apiKey;
+          request.url = finalApiUrl(baseUrl, `/v1beta/models/${params.model || model || 'gemini-2.0-flash'}:generateContent`) + "?key=" + apiKey;
           request.payload = {
             contents: messages
           };
@@ -415,6 +454,7 @@ function createSalsifyAI() {
     function buildTextAttachment(prompt) {
       switch(providerName) {
         case "OpenAI":
+        case "AzureAIFoundry":
         case "Mistral":
         case "GeminiViaOpenAI":
           return { "type": "text", "text": prompt };
@@ -425,6 +465,7 @@ function createSalsifyAI() {
 
     function buildImageAttachment(imageUrl) {
       switch(providerName) {
+        case "AzureAIFoundry":
         case "OpenAI":
           return { "type": "image_url", "image_url": { "url": imageUrl } };
         case "Mistral":
@@ -438,6 +479,7 @@ function createSalsifyAI() {
 
     function defaultImageModel() {
       switch(providerName) {
+        case "AzureAIFoundry":
         case "OpenAI":
           return "gpt-4o";
         case "Mistral":
@@ -490,8 +532,8 @@ function createSalsifyAI() {
             return errors;
           }
         } else {
-          addContext("RESPOND WITH THIS SCHEMA", JSON.stringify(params.responseFormat));
-          addContext("RESPONSE DIRECTIVE", "Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary");
+          addContext("ASSOCIATED RESPONSE SCHEMA", JSON.stringify(params.responseFormat));
+          addContext("RESPONSE DIRECTIVE", "Please output only the raw JSON. Where possible attempt to conform with the supplied schema. Reply without markdown formatting (NO backticks or language directive), explanation, or commentary");
         }
       }
 
@@ -568,13 +610,16 @@ function createSalsifyAI() {
       return createProvider("Anthropic", apiKey, baseUrl || "https://api.anthropic.com");
     },
     geminiProvider: function(apiKey, baseUrl) {
-      return createProvider("Gemini", apiKey, baseUrl || "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
+      return createProvider("Gemini", apiKey, baseUrl || "https://generativelanguage.googleapis.com");
     },
     mistralProvider: function(apiKey, baseUrl) {
       return createProvider("Mistral", apiKey, baseUrl || "https://api.mistral.ai");
     },
     geminiViaOpenAIProvider: function(apiKey, baseUrl) {
       return createProvider("GeminiViaOpenAI", apiKey, baseUrl || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
+    },
+    azureAIFoundryProvider: function(apiKey, baseUrl) {
+      return createProvider("AzureAIFoundry", apiKey, baseUrl);
     }
   };
 }

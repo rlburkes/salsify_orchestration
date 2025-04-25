@@ -286,7 +286,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     expected_messages = [
       {
         "role": "user",
-        "content": "{\"RESPOND WITH THIS SCHEMA\":[\"{\\\"foo\\\":\\\"bar\\\"}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
+        "content": "{\"ASSOCIATED RESPONSE SCHEMA\":[\"{\\\"foo\\\":\\\"bar\\\"}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON. Where possible attempt to conform with the supplied schema. Reply without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
       },
       {
         "role": "user",
@@ -310,8 +310,8 @@ class TestJSAbstractions < Test::Unit::TestCase
       }
     }
     js_code = <<~JS
-      var provider = SalsifyAI.geminiProvider("geminikey", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
-      var response = provider.generateText("Gemini test", {debugPrompt: true, max_tokens: 200, responseFormat: #{responseFormat.to_json}});
+      var provider = SalsifyAI.geminiProvider("geminikey", "https://generativelanguage.googleapis.com");
+      var response = provider.generateText("Gemini test", {debugPrompt: true, max_tokens: 200, model: 'gemini-1.5-flash',responseFormat: #{responseFormat.to_json}});
       response;
     JS
     result = @ctx.eval(js_code)
@@ -320,7 +320,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     expected_messages = [
       {
         "parts": [{
-          "text": "{\"RESPOND WITH THIS SCHEMA\":[\"{\\\"name\\\":\\\"TestSchema\\\",\\\"strict\\\":false,\\\"schema\\\":{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"test\\\":{\\\"type\\\":\\\"string\\\"}},\\\"required\\\":[\\\"test\\\"],\\\"additionalProperties\\\":false}}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
+          "text": "{\"ASSOCIATED RESPONSE SCHEMA\":[\"{\\\"name\\\":\\\"TestSchema\\\",\\\"strict\\\":false,\\\"schema\\\":{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"test\\\":{\\\"type\\\":\\\"string\\\"}},\\\"required\\\":[\\\"test\\\"],\\\"additionalProperties\\\":false}}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON. Where possible attempt to conform with the supplied schema. Reply without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
           }],
         "role": "user"
       },
@@ -334,7 +334,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
 
     # The URL should include the API key as a query parameter.
-    expected_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=geminikey"
+    expected_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=REDACTED"
     assert_equal(expected_url, result["url"], "Gemini URL mismatch")
     # Verify that max_tokens and the generationConfig are set.
     assert_equal(200, result["payload"]["generationConfig"] && result["payload"]["generationConfig"]["maxOutputTokens"], "max_tokens mismatch for Gemini")
@@ -368,7 +368,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     }
 
     js_code = <<~JS
-      var provider = SalsifyAI.geminiProvider("geminikey", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
+      var provider = SalsifyAI.geminiProvider("geminikey", "https://generativelanguage.googleapis.com");
       var response = provider.generateText("Gemini test", {debugPrompt: true, max_tokens: 200, responseFormat: #{responseFormat.to_json}});
       response;
     JS
@@ -378,7 +378,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     expected_messages = [
       {
         "parts" => [{
-          "text": "{\"RESPOND WITH THIS SCHEMA\":[\"{\\\"name\\\":\\\"TestSchema\\\",\\\"strict\\\":true,\\\"schema\\\":{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"test\\\":{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"nested_key\\\":{\\\"type\\\":\\\"string\\\"}},\\\"required\\\":[\\\"nested_key\\\"],\\\"additionalProperties\\\":false}},\\\"required\\\":[\\\"test\\\"],\\\"additionalProperties\\\":false}}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
+          "text": "{\"ASSOCIATED RESPONSE SCHEMA\":[\"{\\\"name\\\":\\\"TestSchema\\\",\\\"strict\\\":true,\\\"schema\\\":{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"test\\\":{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"nested_key\\\":{\\\"type\\\":\\\"string\\\"}},\\\"required\\\":[\\\"nested_key\\\"],\\\"additionalProperties\\\":false}},\\\"required\\\":[\\\"test\\\"],\\\"additionalProperties\\\":false}}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON. Where possible attempt to conform with the supplied schema. Reply without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
         }],
         "role" => "user"
       },
@@ -392,7 +392,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched")
 
     # The URL should include the API key as a query parameter.
-    expected_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=geminikey"
+    expected_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=REDACTED"
     assert_equal(expected_url, result["url"], "Gemini URL mismatch")
     # Verify that max_tokens and the generationConfig are set.
     assert_equal(200, result["payload"]["generationConfig"] && result["payload"]["generationConfig"]["maxOutputTokens"], "max_tokens mismatch for Gemini")
@@ -429,7 +429,7 @@ class TestJSAbstractions < Test::Unit::TestCase
       }
     }
     js_code = <<~JS
-      var provider = SalsifyAI.geminiProvider("geminikey", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
+      var provider = SalsifyAI.geminiProvider("geminikey", "https://generativelanguage.googleapis.com");
       var response = provider.analyzeImage(["https://foo.png"],"Caption this image", {debugPrompt: true});
       response;
     JS
@@ -468,7 +468,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     expected_messages = [
       {
         "role": "user",
-        "content": "{\"RESPOND WITH THIS SCHEMA\":[\"{\\\"dummy\\\":true}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
+        "content": "{\"ASSOCIATED RESPONSE SCHEMA\":[\"{\\\"dummy\\\":true}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON. Where possible attempt to conform with the supplied schema. Reply without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
       },
       {
         "role": "user",
@@ -498,7 +498,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     expected_messages = [
       {
         "role": "user",
-        "content": "{\"RESPOND WITH THIS SCHEMA\":[\"{\\\"dummy\\\":true}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
+        "content": "{\"ASSOCIATED RESPONSE SCHEMA\":[\"{\\\"dummy\\\":true}\"],\"RESPONSE DIRECTIVE\":[\"Please output only the raw JSON. Where possible attempt to conform with the supplied schema. Reply without markdown formatting (NO backticks or language directive), explanation, or commentary\"]}"
       },
       {
         "role": "user",
@@ -605,6 +605,60 @@ class TestJSAbstractions < Test::Unit::TestCase
       }
     ]
     assert_equal(deep_stringify_keys(expected_messages), messages, "Messages Mismatched");
+  end
+
+  def test_salsify_ai_azure_ai_foundry_provider
+    responseFormat = {
+      "name": "TestSchema",
+      "strict": true,
+      "schema": {
+        "type": "object",
+        "properties": { test: { type: "string" } },
+        "required": ["test"],
+        "additionalProperties": false
+      }
+    }
+
+    js_code = <<~JS
+      var provider = SalsifyAI.azureAIFoundryProvider("azkey", "https://az.openai.azure.com");
+      var response = provider.generateText("Azure test", {
+        debugPrompt: true,
+        responseFormat: #{responseFormat.to_json}
+      });
+      response;
+    JS
+
+    result = @ctx.eval(js_code)
+    puts result
+
+    # Validate the prompt structure
+    messages = result["payload"]["messages"]
+    expected_messages = [
+      {
+        "role" => "user",
+        "content" => "Azure test"
+      }
+    ]
+    assert_equal(expected_messages, messages, "Messages mismatch")
+
+    # Validate the request URL
+    expected_url = "https://az.openai.azure.com/chat/completions?api-version=2024-10-21"
+    assert_equal(expected_url, result["url"], "Azure URL mismatch")
+
+    # Validate headers
+    assert_equal("REDACTED", result["headers"]["api-key"], "Azure API key header mismatch")
+
+    # Validate payload shape
+    expected_response_format = {
+      "json_schema" => deep_stringify_keys(responseFormat),
+      "type" => "json_schema"
+    }
+    assert_equal(expected_response_format, result["payload"]["response_format"], "Azure responseFormat mapping failed")
+
+    # Validate a couple default payload values
+    assert_equal(1200, result["payload"]["max_completion_tokens"], "Azure default max_completion_tokens mismatch")
+    assert_equal(1, result["payload"]["n"], "Azure default 'n' mismatch")
+    assert_equal(true, result["payload"]["parrallel_tool_calls"], "Azure default 'parallel_tool_calls' mismatch")
   end
 
   def test_add_context_chainability
