@@ -658,7 +658,7 @@ class TestJSAbstractions < Test::Unit::TestCase
     # Validate a couple default payload values
     assert_equal(1200, result["payload"]["max_completion_tokens"], "Azure default max_completion_tokens mismatch")
     assert_equal(1, result["payload"]["n"], "Azure default 'n' mismatch")
-    assert_equal(true, result["payload"]["parrallel_tool_calls"], "Azure default 'parallel_tool_calls' mismatch")
+    assert_equal(1, result["payload"]["top_p"], "Azure default 'top_p' mismatch")
   end
 
   def test_add_context_chainability

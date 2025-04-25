@@ -372,12 +372,9 @@ function createSalsifyAI() {
             logit_bias: params.logit_bias || null,
             user: params.user || null,
             messages: messages,
-            data_sources: params.data_sources || null,
             logprobs: params.logprobs || null,
             n: params.n || 1,
-            parrallel_tool_calls: params.parallel_tool_calls || true,
             tools: params.tools || null,
-            tool_choices: params.tool_choices || null,
             seed: params.seed || null
           };
           if (params.responseFormat) {
